@@ -1,0 +1,21 @@
+# Gradle
+.gradle/
+build/
+*.class
+
+# Kotlin
+.kotlin/
+
+# IDE
+.idea/
+*.iml
+
+# Local properties (SDK paths, not shareable)
+local.properties
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Art cache (generated at runtime)
+art_cache/
