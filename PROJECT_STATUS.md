@@ -1,11 +1,22 @@
 # Local Music Player — Project Status
 
-Last updated: 2026-10-24 (Phase 2 desktop Dark Glass UI)
+Last updated: 2026-10-24 (Phase 2 desktop sidebar and vector-icon pass)
 
 ## Current phase
 
-**Phase 2 — desktop Dark Glass theme and Home discovery shelves (implemented; compile only).**
+**Phase 2 — desktop Dark Glass theme, sidebar shell and vector icons (implemented; compile only).**
 Phase 1 runtime gate below is still open.
+
+## Phase 2 — sidebar shell and vector icons (2026-10-24)
+
+- Desktop shell is now a left sidebar (220 dp) plus a content column, replacing the seven nav pills that were cramped in an 860 dp window. Sidebar holds the SoundVault logo tile, `BROWSE` (Home, Artists, Albums, Queue) and `LIBRARY` (Playlists, Favorites, History) sections with live counts on Queue and Favorites, the chosen folder name, and an `Open Folder` button pinned to the bottom.
+- Every emoji glyph in `Main.kt` was replaced with a `PlayerIcons` vector from `ui/Icons.kt`: sidebar and folder button, transport controls, favourite hearts, track-row add-to-playlist, and the artwork fallback note.
+- Track lists moved from bordered cards to a flat table style: rows are transparent until they are the playing track, with a 32 dp index column, artwork, title/artist, duration, and the favourite toggle. Favourites rows gained artwork.
+- The floating dock keeps the existing transport and seek slider, now with vector icons, a favourite toggle for the current track, a `BorderSubtle` hairline, and a slimmer seek track with a white thumb.
+- Window default is 1100×800; content reserves 108 dp bottom padding for the dock.
+- `Theme.kt`, `DesktopLocalPlayer`, playback, folder picking, and persistence are unchanged.
+- Compile: `./gradlew :desktopApp:compileKotlin --console=plain` — **PASS**, BUILD SUCCESSFUL. Only the known `loadImageBitmap` deprecation warning.
+- Not verified at runtime: no GUI pass, so sidebar spacing, icon weights, the dock's fit inside 108 dp, and the flat row hover/playing states have not been seen on screen.
 
 ## Phase 2 — Dark Glass theme and discovery shelves (2026-10-24)
 

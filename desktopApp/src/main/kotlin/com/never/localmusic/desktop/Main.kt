@@ -1,5 +1,6 @@
 package com.never.localmusic.desktop
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -27,6 +28,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -47,6 +49,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.loadImageBitmap
 import androidx.compose.ui.text.font.FontWeight
@@ -57,6 +60,7 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.never.localmusic.core.TrackView
+import com.never.localmusic.desktop.ui.PlayerIcons
 import com.never.localmusic.shared.LocalPlayerSnapshot
 import com.never.localmusic.shared.Playlist
 import java.io.File
@@ -78,8 +82,8 @@ fun main() = application {
             player.dispose()
             exitApplication()
         },
-        title = "Local Music Player",
-        state = rememberWindowState(width = 1060.dp, height = 780.dp),
+        title = "SoundVault",
+        state = rememberWindowState(width = 1100.dp, height = 800.dp),
     ) {
         DarkGlassTheme {
             Box(modifier = Modifier.fillMaxSize().background(GlassColors.Background)) {
@@ -89,22 +93,19 @@ fun main() = application {
     }
 }
 
-private data class NavItem(val icon: String, val label: String)
-
-private val browseNavItems = listOf(
-    NavItem("\uD83C\uDFE0", "Home"),
-    NavItem("\uD83C\uDFA4", "Artists"),
-    NavItem("\uD83D\uDCBF", "Albums"),
-    NavItem("\uD83D\uDCCB", "Queue"),
+private val navTitles = listOf(
+    "Home",
+    "Artists",
+    "Albums",
+    "Play Queue",
+    "Your Playlists",
+    "Favorites",
+    "Listening History",
 )
 
-private val libraryNavItems = listOf(
-    NavItem("\uD83C\uDFB5", "Playlists"),
-    NavItem("\u2764\uFE0F", "Favorites"),
-    NavItem("\u23F1", "History"),
-)
-
-private val navTitles = listOf("Home", "Artists", "Albums", "Queue", "Playlists", "Favorites", "History")
+// Muted icon/label tint used by unselected sidebar rows and secondary controls.
+private val NavIdle = Color(0xFF94A3B8)
+private val NavDim = Color(0xFF64748B)
 
 @Composable
 fun LocalMusicApp(player: DesktopLocalPlayer) {
@@ -117,7 +118,7 @@ fun LocalMusicApp(player: DesktopLocalPlayer) {
     var addToPlaylistTrack by remember { mutableStateOf<TrackView?>(null) }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        Row(modifier = Modifier.fillMaxSize().padding(bottom = 88.dp)) {
+        Row(modifier = Modifier.fillMaxSize().padding(bottom = 108.dp)) {
 
             // ── Left Sidebar ──
             Column(
@@ -130,21 +131,41 @@ fun LocalMusicApp(player: DesktopLocalPlayer) {
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     // App Logo
-                    Text(
-                        "SoundVault",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = GlassColors.Accent,
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
-                    )
-                    Text(
-                        folderName?.let { "Folder: $it" } ?: "No folder selected",
-                        fontSize = 11.sp,
-                        color = GlassColors.TextMuted,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(horizontal = 20.dp),
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(GlassColors.Accent),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                PlayerIcons.MusicNote,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(18.dp),
+                            )
+                        }
+                        Column {
+                            Text(
+                                "SoundVault",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = GlassColors.TextPrimary,
+                            )
+                            Text(
+                                folderName ?: "No library loaded",
+                                fontSize = 11.sp,
+                                color = GlassColors.TextMuted,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
 
                     HorizontalDivider(
                         color = GlassColors.Border,
@@ -162,14 +183,14 @@ fun LocalMusicApp(player: DesktopLocalPlayer) {
                     )
 
                     // Nav items
-                    browseNavItems.forEachIndexed { index, item ->
-                        SidebarNavItem(
-                            icon = item.icon,
-                            label = item.label,
-                            isSelected = selectedNav == index,
-                            onClick = { selectedNav = index },
-                        )
-                    }
+                    SidebarNavItem(PlayerIcons.Home, "Home", selectedNav == 0) { selectedNav = 0 }
+                    SidebarNavItem(PlayerIcons.Artists, "Artists", selectedNav == 1) { selectedNav = 1 }
+                    SidebarNavItem(PlayerIcons.Albums, "Albums", selectedNav == 2) { selectedNav = 2 }
+                    SidebarNavItem(
+                        PlayerIcons.Queue,
+                        "Queue (${snap.queue.size})",
+                        selectedNav == 3,
+                    ) { selectedNav = 3 }
 
                     HorizontalDivider(
                         color = GlassColors.Border,
@@ -185,18 +206,17 @@ fun LocalMusicApp(player: DesktopLocalPlayer) {
                         modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
                     )
 
-                    libraryNavItems.forEachIndexed { index, item ->
-                        SidebarNavItem(
-                            icon = item.icon,
-                            label = item.label,
-                            isSelected = selectedNav == index + 4,
-                            onClick = { selectedNav = index + 4 },
-                        )
-                    }
+                    SidebarNavItem(PlayerIcons.Playlists, "Playlists", selectedNav == 4) { selectedNav = 4 }
+                    SidebarNavItem(
+                        PlayerIcons.Favorite,
+                        "Favorites (${snap.favorites.size})",
+                        selectedNav == 5,
+                    ) { selectedNav = 5 }
+                    SidebarNavItem(PlayerIcons.History, "History", selectedNav == 6) { selectedNav = 6 }
                 }
 
                 // Open Folder button at the bottom
-                Button(
+                OutlinedButton(
                     onClick = {
                         scope.launch(Dispatchers.IO) {
                             val folder = chooseFolder()
@@ -206,11 +226,21 @@ fun LocalMusicApp(player: DesktopLocalPlayer) {
                             }
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = GlassColors.Accent),
                     shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    border = BorderStroke(1.dp, GlassColors.Border),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = GlassColors.TextPrimary,
+                    ),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(42.dp),
                 ) {
-                    Text("\uD83D\uDCC2  Open Folder", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    Icon(
+                        PlayerIcons.Folder,
+                        contentDescription = null,
+                        tint = GlassColors.Accent,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Open Folder", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
 
@@ -239,10 +269,22 @@ fun LocalMusicApp(player: DesktopLocalPlayer) {
                             player.search(it)
                         },
                         placeholder = {
-                            Text("Search...", color = GlassColors.TextMuted, fontSize = 13.sp)
+                            Text(
+                                "Search songs, artists, albums...",
+                                color = NavDim,
+                                fontSize = 13.sp,
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(
+                                PlayerIcons.Search,
+                                contentDescription = null,
+                                tint = NavDim,
+                                modifier = Modifier.size(18.dp),
+                            )
                         },
                         singleLine = true,
-                        modifier = Modifier.width(280.dp).height(46.dp),
+                        modifier = Modifier.width(320.dp).height(46.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = GlassColors.Accent,
                             unfocusedBorderColor = GlassColors.Border,
@@ -314,6 +356,7 @@ fun LocalMusicApp(player: DesktopLocalPlayer) {
                 onSeek = { player.seekTo(it) },
                 onToggleShuffle = { player.toggleShuffle() },
                 onToggleRepeat = { player.toggleRepeat() },
+                onToggleFavorite = { trackId -> player.toggleFavorite(trackId) },
             )
         }
 
@@ -339,7 +382,7 @@ fun LocalMusicApp(player: DesktopLocalPlayer) {
 
 @Composable
 fun SidebarNavItem(
-    icon: String,
+    icon: ImageVector,
     label: String,
     isSelected: Boolean,
     onClick: () -> Unit,
@@ -351,16 +394,21 @@ fun SidebarNavItem(
             .clip(RoundedCornerShape(8.dp))
             .background(if (isSelected) GlassColors.GlassCardHover else Color.Transparent)
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .padding(horizontal = 12.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(icon, fontSize = 16.sp)
+        Icon(
+            icon,
+            contentDescription = null,
+            modifier = Modifier.size(18.dp),
+            tint = if (isSelected) GlassColors.Accent else NavIdle,
+        )
         Text(
             label,
             fontSize = 13.sp,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-            color = if (isSelected) GlassColors.TextPrimary else GlassColors.TextSecondary,
+            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+            color = if (isSelected) GlassColors.TextPrimary else NavIdle,
         )
     }
 }
@@ -398,7 +446,8 @@ fun HomeLibraryView(
                             Box(
                                 modifier = Modifier
                                     .width(150.dp)
-                                    .glassPanel()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(GlassColors.GlassCard)
                                     .clickable { track?.let { onPlay(it) } }
                                     .padding(12.dp),
                             ) {
@@ -473,13 +522,10 @@ fun HomeLibraryView(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .glassPanel(
-                            cornerRadius = 10.dp,
-                            backgroundColor = if (isPlayingThis) GlassColors.GlassCardHover else GlassColors.Surface,
-                            borderColor = if (isPlayingThis) GlassColors.Accent else GlassColors.Border,
-                        )
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (isPlayingThis) GlassColors.GlassCardHover else Color.Transparent)
                         .clickable { onPlay(track) }
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
@@ -528,12 +574,22 @@ fun HomeLibraryView(
                             onClick = { onAddToPlaylist(track) },
                             modifier = Modifier.size(28.dp),
                         ) {
-                            Text("+", fontSize = 16.sp, color = GlassColors.TextMuted)
+                            Icon(
+                                PlayerIcons.Playlists,
+                                contentDescription = "Add to playlist",
+                                tint = NavDim,
+                                modifier = Modifier.size(15.dp),
+                            )
                         }
                     }
 
                     IconButton(onClick = { onToggleFav(track.id) }, modifier = Modifier.size(28.dp)) {
-                        Text(if (isFav) "\u2764\uFE0F" else "\uD83E\uDD0D", fontSize = 14.sp)
+                        Icon(
+                            if (isFav) PlayerIcons.Favorite else PlayerIcons.FavoriteBorder,
+                            contentDescription = "Favorite",
+                            tint = if (isFav) GlassColors.Accent else NavDim,
+                            modifier = Modifier.size(15.dp),
+                        )
                     }
                 }
             }
@@ -574,7 +630,8 @@ fun ArtistsView(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .glassPanel(cornerRadius = 12.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(GlassColors.GlassCard)
                             .clickable { expandedArtist = if (isExpanded) null else artist }
                             .padding(14.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -620,7 +677,7 @@ fun ArtistsView(
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .glassPanel(cornerRadius = 8.dp, backgroundColor = GlassColors.Surface)
+                                        .clip(RoundedCornerShape(6.dp))
                                         .clickable { onPlay(track) }
                                         .padding(10.dp),
                                     verticalAlignment = Alignment.CenterVertically,
@@ -695,7 +752,8 @@ fun AlbumsView(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .glassPanel(cornerRadius = 12.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(GlassColors.GlassCard)
                             .clickable { expandedAlbum = if (isExpanded) null else album }
                             .padding(14.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -744,7 +802,7 @@ fun AlbumsView(
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .glassPanel(cornerRadius = 8.dp, backgroundColor = GlassColors.Surface)
+                                        .clip(RoundedCornerShape(6.dp))
                                         .clickable { onPlay(track) }
                                         .padding(10.dp),
                                     verticalAlignment = Alignment.CenterVertically,
@@ -820,7 +878,8 @@ fun QueueView(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .glassPanel(cornerRadius = 12.dp, borderColor = GlassColors.Accent)
+                        .clip(RoundedCornerShape(10.dp))
+                    .background(Color(0xFF161A26))
                         .padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -861,8 +920,8 @@ fun QueueView(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .glassPanel(cornerRadius = 10.dp)
-                            .clickable { onPlay(track) }
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { onPlay(track) }
                             .padding(horizontal = 12.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -914,18 +973,20 @@ fun FloatingNowPlayingBar(
     onSeek: (Long) -> Unit,
     onToggleShuffle: () -> Unit,
     onToggleRepeat: () -> Unit,
+    onToggleFavorite: (String) -> Unit,
 ) {
     val track = snap.nowPlaying
+    val isFav = track != null && snap.favorites.contains(track.id)
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .glassPanel(
                 cornerRadius = 16.dp,
-                backgroundColor = Color(0xEE161A26),
-                borderColor = GlassColors.Border,
+                backgroundColor = Color(0xF0141722),
+                borderColor = GlassColors.BorderSubtle,
             )
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .padding(horizontal = 18.dp, vertical = 10.dp),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(
@@ -963,6 +1024,20 @@ fun FloatingNowPlayingBar(
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
+
+                    if (track != null) {
+                        IconButton(
+                            onClick = { onToggleFavorite(track.id) },
+                            modifier = Modifier.size(28.dp),
+                        ) {
+                            Icon(
+                                if (isFav) PlayerIcons.Favorite else PlayerIcons.FavoriteBorder,
+                                contentDescription = "Favorite",
+                                tint = if (isFav) GlassColors.Accent else NavDim,
+                                modifier = Modifier.size(16.dp),
+                            )
+                        }
+                    }
                 }
 
                 // Transport Controls
@@ -971,37 +1046,50 @@ fun FloatingNowPlayingBar(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     IconButton(onClick = onToggleShuffle, modifier = Modifier.size(32.dp)) {
-                        Text(
-                            "\uD83D\uDD00",
-                            fontSize = 13.sp,
-                            color = if (snap.isShuffle) GlassColors.Accent else GlassColors.TextPrimary,
+                        Icon(
+                            PlayerIcons.Shuffle,
+                            contentDescription = "Shuffle",
+                            tint = if (snap.isShuffle) GlassColors.Accent else NavDim,
+                            modifier = Modifier.size(16.dp),
                         )
                     }
-                    IconButton(onClick = onPrevious, modifier = Modifier.size(34.dp)) {
-                        Text("\u23EE", fontSize = 16.sp, color = GlassColors.TextPrimary)
+                    IconButton(onClick = onPrevious, modifier = Modifier.size(36.dp)) {
+                        Icon(
+                            PlayerIcons.SkipPrev,
+                            contentDescription = "Previous",
+                            tint = GlassColors.TextPrimary,
+                            modifier = Modifier.size(18.dp),
+                        )
                     }
                     Box(
                         modifier = Modifier
-                            .size(40.dp)
+                            .size(38.dp)
                             .clip(CircleShape)
                             .background(GlassColors.Accent)
                             .clickable { onTogglePlayPause() },
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text(
-                            if (snap.isPlaying) "\u23F8" else "\u25B6",
-                            fontSize = 16.sp,
-                            color = Color.White,
+                        Icon(
+                            if (snap.isPlaying) PlayerIcons.Pause else PlayerIcons.Play,
+                            contentDescription = if (snap.isPlaying) "Pause" else "Play",
+                            tint = Color.White,
+                            modifier = Modifier.size(18.dp),
                         )
                     }
-                    IconButton(onClick = onNext, modifier = Modifier.size(34.dp)) {
-                        Text("\u23ED", fontSize = 16.sp, color = GlassColors.TextPrimary)
+                    IconButton(onClick = onNext, modifier = Modifier.size(36.dp)) {
+                        Icon(
+                            PlayerIcons.SkipNext,
+                            contentDescription = "Next",
+                            tint = GlassColors.TextPrimary,
+                            modifier = Modifier.size(18.dp),
+                        )
                     }
                     IconButton(onClick = onToggleRepeat, modifier = Modifier.size(32.dp)) {
-                        Text(
-                            "\uD83D\uDD01",
-                            fontSize = 13.sp,
-                            color = if (snap.isRepeat) GlassColors.Accent else GlassColors.TextPrimary,
+                        Icon(
+                            PlayerIcons.Repeat,
+                            contentDescription = "Repeat",
+                            tint = if (snap.isRepeat) GlassColors.Accent else NavDim,
+                            modifier = Modifier.size(16.dp),
                         )
                     }
                 }
@@ -1018,9 +1106,9 @@ fun FloatingNowPlayingBar(
                     value = snap.positionMs.toFloat(),
                     onValueChange = { onSeek(it.toLong()) },
                     valueRange = 0f..(snap.durationMs.coerceAtLeast(1L)).toFloat(),
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).height(12.dp),
                     colors = SliderDefaults.colors(
-                        thumbColor = GlassColors.Accent,
+                        thumbColor = GlassColors.TextPrimary,
                         activeTrackColor = GlassColors.Accent,
                         inactiveTrackColor = GlassColors.Border,
                     ),
@@ -1064,7 +1152,12 @@ fun TrackArtwork(
                 modifier = Modifier.fillMaxSize(),
             )
         } else {
-            Text("\uD83C\uDFB5", fontSize = fallbackIconSize)
+            Icon(
+                PlayerIcons.MusicNote,
+                contentDescription = null,
+                tint = Color(0xFF475569),
+                modifier = Modifier.size(fallbackIconSize.value.dp),
+            )
         }
     }
 }
@@ -1109,7 +1202,11 @@ fun PlaylistsView(
             LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 items(snap.playlists, key = { it.id }) { pl ->
                     Row(
-                        modifier = Modifier.fillMaxWidth().glassPanel().padding(14.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(GlassColors.GlassCard)
+                            .padding(14.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
@@ -1174,13 +1271,20 @@ fun FavoritesView(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .glassPanel()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(GlassColors.GlassCard)
                             .clickable { onPlay(track) }
                             .padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        Column {
+                        TrackArtwork(
+                            artPath = track.artPath,
+                            modifier = Modifier.size(38.dp).clip(RoundedCornerShape(6.dp)),
+                            fallbackIconSize = 14.sp,
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 track.title,
                                 fontWeight = FontWeight.SemiBold,
@@ -1193,7 +1297,12 @@ fun FavoritesView(
                             )
                         }
                         IconButton(onClick = { onToggleFav(track.id) }) {
-                            Text("\u2764\uFE0F")
+                            Icon(
+                                PlayerIcons.Favorite,
+                                contentDescription = "Remove from favorites",
+                                tint = GlassColors.Accent,
+                                modifier = Modifier.size(16.dp),
+                            )
                         }
                     }
                 }
@@ -1248,7 +1357,8 @@ fun HistoryView(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .glassPanel()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(GlassColors.GlassCard)
                             .clickable { onPlay(entry.trackId) }
                             .padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically,
