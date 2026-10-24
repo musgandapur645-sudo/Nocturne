@@ -8,6 +8,8 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
@@ -39,12 +41,18 @@ object GlassColors {
 
 /**
  * Convx / Apple-style refractive glass panel modifier.
- * Uses translucent surface fill and a specular highlight border.
+ *
+ * Three layers make a surface read as glass over the mesh backdrop:
+ * 1. a soft drop shadow that lifts the slab off the ambient field,
+ * 2. a translucent tint fill so the blurred colors show through,
+ * 3. a specular stroke — bright at the top edge, fading to nothing — that
+ *    catches the light the way Convx's floating panels do.
  */
 fun Modifier.glassPanel(
     cornerRadius: Dp = 16.dp,
     backgroundColor: Color = GlassColors.GlassCard,
     borderColor: Color = GlassColors.Border,
+    elevation: Dp = 8.dp,
 ): Modifier {
     val shape = RoundedCornerShape(cornerRadius)
     val specularBrush = Brush.verticalGradient(
@@ -54,8 +62,18 @@ fun Modifier.glassPanel(
         ),
     )
     return this
+        .shadow(elevation, shape, ambientColor = Color(0x44000000), spotColor = Color(0x55000000))
         .clip(shape)
         .background(backgroundColor)
+        // Top-edge highlight: white light pooling at the top of the slab.
+        .drawBehind {
+            drawRect(
+                brush = Brush.verticalGradient(
+                    0f to Color.White.copy(alpha = 0.07f),
+                    0.3f to Color.Transparent,
+                ),
+            )
+        }
         .border(1.dp, specularBrush, shape)
 }
 

@@ -1,11 +1,19 @@
 package com.never.localmusic.desktop
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,11 +42,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -46,37 +53,64 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.loadImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.never.localmusic.core.TrackView
-import com.never.localmusic.desktop.ui.AmbientMeshBackground
+import com.never.localmusic.desktop.ui.ConvxMeshBackground
 import com.never.localmusic.desktop.ui.PlayerIcons
+import com.never.localmusic.desktop.ui.rememberArtworkPalette
 import com.never.localmusic.shared.LocalPlayerSnapshot
 import com.never.localmusic.shared.Playlist
 import java.io.File
 import javax.swing.JFileChooser
 import javax.swing.SwingUtilities
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
-fun main() = application {
+fun main(args: Array<String>) = application {
     val player = remember {
         DesktopLocalPlayer().also {
             DesktopMain.chooseFolder = { chooseFolder() }
+        }
+    }
+    // Optional startup folder: `desktopApp <musicDir> [--play]` boots the library
+    // directly, skipping the JFileChooser dialog; --play also starts the first track.
+    LaunchedEffect(Unit) {
+        val folder = args.firstOrNull()?.let(::File)?.takeIf { it.isDirectory && it.canRead() }
+            ?: return@LaunchedEffect
+        player.updateSelectedFolder(folder)
+        if (args.getOrNull(1) == "--play") {
+            // The folder scan is async; wait (bounded) for it to surface tracks.
+            withTimeoutOrNull(15_000) {
+                while (player.snapshot.library.isEmpty()) delay(100)
+            }
+            player.snapshot.library.firstOrNull()?.let(player::playSelected)
         }
     }
 
@@ -108,20 +142,27 @@ private val navTitles = listOf(
 private val NavIdle = Color(0xFF94A3B8)
 private val NavDim = Color(0xFF64748B)
 
+/** Displayed under the SoundVault logo; TrackView.id is the absolute file path. */
+private fun LibraryFolderName(library: List<TrackView>): String {
+    val folder = library.firstOrNull()?.let { File(it.id).parentFile } ?: return "No library loaded"
+    return folder.name
+}
+
 @Composable
 fun LocalMusicApp(player: DesktopLocalPlayer) {
     val snap by player.snapshotFlow.collectAsState()
     val scope = rememberCoroutineScope()
     var selectedNav by rememberSaveable { mutableStateOf(0) }
     var searchQuery by remember { mutableStateOf("") }
-    var folderName by remember { mutableStateOf<String?>(null) }
     var showNewPlaylistDialog by remember { mutableStateOf(false) }
     var addToPlaylistTrack by remember { mutableStateOf<TrackView?>(null) }
 
     Box(modifier = Modifier.fillMaxSize().background(GlassColors.Background)) {
-        // 1. Ambient blurred dynamic mesh backdrop
-        AmbientMeshBackground(
-            accentColor = if (snap.isPlaying) GlassColors.Accent else Color(0xFF6366F1),
+        // Convx ambient mesh: four artwork-derived blobs drifting under a heavy blur.
+        // All panels below are translucent, so this color field is what they refract.
+        ConvxMeshBackground(
+            palette = rememberArtworkPalette(snap.nowPlaying?.artPath),
+            trackKey = snap.nowPlaying?.id,
         )
 
         // 2. Floating Island layout: Sidebar + Main Content Area
@@ -179,7 +220,7 @@ fun LocalMusicApp(player: DesktopLocalPlayer) {
                                 letterSpacing = 0.5.sp,
                             )
                             Text(
-                                folderName ?: "No library loaded",
+                                LibraryFolderName(snap.library),
                                 fontSize = 11.sp,
                                 color = GlassColors.TextMuted,
                                 maxLines = 1,
@@ -244,7 +285,6 @@ fun LocalMusicApp(player: DesktopLocalPlayer) {
                         scope.launch(Dispatchers.IO) {
                             val folder = chooseFolder()
                             if (folder != null) withContext(Dispatchers.Main) {
-                                folderName = folder.name
                                 player.updateSelectedFolder(folder)
                             }
                         }
@@ -421,22 +461,32 @@ fun SidebarNavItem(
     badgeCount: Int? = null,
     onClick: () -> Unit,
 ) {
+    var isHovered by remember { mutableStateOf(false) }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
             .background(
-                if (isSelected) Color(0x25E11D48) else Color.Transparent,
+                when {
+                    isSelected -> Color(0x25E11D48)
+                    isHovered -> Color.White.copy(alpha = 0.05f)
+                    else -> Color.Transparent
+                },
             )
-            .then(
-                if (isSelected) Modifier.border(
-                    1.dp,
-                    Brush.horizontalGradient(
-                        listOf(Color(0x60E11D48), Color(0x15E11D48)),
-                    ),
-                    RoundedCornerShape(10.dp),
-                ) else Modifier
-            )
+            // Convx active accent indicator: a small rounded crimson bar on the left edge.
+            .drawBehind {
+                if (isSelected) {
+                    drawRoundRect(
+                        color = GlassColors.Accent,
+                        topLeft = Offset(0f, size.height / 2f - 9.dp.toPx() / 2f),
+                        size = Size(3.dp.toPx(), 18.dp.toPx()),
+                        cornerRadius = CornerRadius(2.dp.toPx()),
+                    )
+                }
+            }
+            .hoverChanged { isHovered = true }
+            .hoverChanged(false) { isHovered = false }
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -588,12 +638,21 @@ fun HomeLibraryView(
             itemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
                 val isPlayingThis = snap.nowPlaying?.id == track.id
                 val isFav = snap.favorites.contains(track.id)
+                var trackIsHovered by remember { mutableStateOf(false) }
 
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(8.dp))
-                        .background(if (isPlayingThis) Color(0x35E11D48) else Color.Transparent)
+                        .background(
+                            when {
+                                isPlayingThis -> Color(0x35E11D48)
+                                trackIsHovered -> Color.White.copy(alpha = 0.04f)
+                                else -> Color.Transparent
+                            },
+                        )
+                        .hoverChanged { trackIsHovered = true }
+                        .hoverChanged(false) { trackIsHovered = false }
                         .clickable { onPlay(track) }
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -1047,6 +1106,7 @@ fun QueueView(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun FloatingNowPlayingBar(
     snap: LocalPlayerSnapshot,
@@ -1060,145 +1120,227 @@ fun FloatingNowPlayingBar(
 ) {
     val track = snap.nowPlaying
     val isFav = track != null && snap.favorites.contains(track.id)
+    val duration = snap.durationMs.coerceAtLeast(1L)
+    val progress = (snap.positionMs.toFloat() / duration).coerceIn(0f, 1f)
+
+    // Reads fresh values inside the long-lived drag gesture without restarting it.
+    val seekTo by rememberUpdatedState(onSeek)
+    val durationNow by rememberUpdatedState(duration)
+    val progressNow by rememberUpdatedState(progress)
+    var dragFraction by remember { mutableStateOf<Float?>(null) }
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
+            .height(64.dp)
             .glassPanel(
-                cornerRadius = 18.dp,
-                backgroundColor = Color(0x80101524),
-                borderColor = Color(0x38FFFFFF),
-            )
-            .padding(horizontal = 18.dp, vertical = 10.dp),
+                cornerRadius = 32.dp,
+                backgroundColor = Color(0x8C0E1220),
+                borderColor = Color(0x40FFFFFF),
+                elevation = 14.dp,
+            ),
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                // Track metadata thumbnail
-                Row(
-                    modifier = Modifier.weight(1f),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    TrackArtwork(
-                        artPath = track?.artPath,
-                        modifier = Modifier
-                            .size(44.dp)
-                            .clip(RoundedCornerShape(8.dp)),
-                        fallbackIconSize = 20.sp,
-                    )
-                    Column {
-                        Text(
-                            track?.title ?: "No track playing",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = GlassColors.TextPrimary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Text(
-                            track?.artist ?: "Select a song from library",
-                            fontSize = 11.sp,
-                            color = GlassColors.TextSecondary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-
-                    if (track != null) {
-                        IconButton(
-                            onClick = { onToggleFavorite(track.id) },
-                            modifier = Modifier.size(28.dp),
-                        ) {
-                            Icon(
-                                if (isFav) PlayerIcons.Favorite else PlayerIcons.FavoriteBorder,
-                                contentDescription = "Favorite",
-                                tint = if (isFav) GlassColors.Accent else NavDim,
-                                modifier = Modifier.size(16.dp),
-                            )
-                        }
+        // Convx signature: playback as a 3 dp strip along the dock's bottom edge.
+        // The capsule clip soft-tapers its ends. Drag it to scrub.
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(3.dp)
+                .align(Alignment.BottomCenter)
+                .drawBehind {
+                    drawRect(Color.White.copy(alpha = 0.15f))
+                    val fraction = dragFraction ?: progressNow
+                    if (fraction > 0f) {
+                        drawRect(GlassColors.Accent, size = Size(size.width * fraction, size.height))
                     }
                 }
+                .pointerInput(track?.id) {
+                    detectHorizontalDragGestures(
+                        onDragStart = { offset ->
+                            dragFraction = (offset.x / size.width).coerceIn(0f, 1f)
+                        },
+                        onDragEnd = {
+                            dragFraction?.let { seekTo((it * durationNow).toLong()) }
+                            dragFraction = null
+                        },
+                        onDragCancel = { dragFraction = null },
+                    ) { change, dragAmount ->
+                        change.consume()
+                        dragFraction = ((dragFraction ?: progressNow) + dragAmount / size.width)
+                            .coerceIn(0f, 1f)
+                    }
+                },
+        )
 
-                // Transport Controls
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(start = 10.dp, end = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            // Artwork + Convx typography: 15 sp semibold title with tight tracking,
+            // 11 sp artist at 75% weight. Both marquee like AppleMiniPlayer.
+            Row(
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TrackArtwork(
+                    artPath = track?.artPath,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(10.dp)),
+                    fallbackIconSize = 18.sp,
+                )
+                Column(modifier = Modifier.weight(1f, fill = false)) {
+                    Text(
+                        track?.title ?: "No track playing",
+                        fontSize = 15.sp,
+                        lineHeight = 18.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = (-0.23).sp,
+                        color = GlassColors.TextPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.basicMarquee(
+                            iterations = 1,
+                            initialDelayMillis = 3000,
+                            velocity = 30.dp,
+                        ),
+                    )
+                    Text(
+                        track?.artist ?: "Select a song from library",
+                        fontSize = 11.sp,
+                        lineHeight = 13.sp,
+                        letterSpacing = 0.06.sp,
+                        color = GlassColors.TextSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.basicMarquee(
+                            iterations = 1,
+                            initialDelayMillis = 3000,
+                            velocity = 30.dp,
+                        ),
+                    )
+                }
+
+                if (track != null) {
+                    IconButton(
+                        onClick = { onToggleFavorite(track.id) },
+                        modifier = Modifier.size(30.dp),
+                    ) {
+                        Icon(
+                            if (isFav) PlayerIcons.Favorite else PlayerIcons.FavoriteBorder,
+                            contentDescription = "Favorite",
+                            tint = if (isFav) GlassColors.Accent else NavDim,
+                            modifier = Modifier.size(17.dp),
+                        )
+                    }
+                }
+            }
+
+            // Transport: spring-pressed Convx icon buttons around the accent play circle.
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                SpringIconButton(
+                    icon = PlayerIcons.Shuffle,
+                    description = "Shuffle",
+                    tint = if (snap.isShuffle) GlassColors.Accent else NavDim,
+                    iconSize = 17.dp,
+                    onClick = onToggleShuffle,
+                )
+                SpringIconButton(
+                    icon = PlayerIcons.SkipPrev,
+                    description = "Previous",
+                    iconSize = 20.dp,
+                    onClick = onPrevious,
+                )
+
+                val playInteraction = remember { MutableInteractionSource() }
+                val playPressed by playInteraction.collectIsPressedAsState()
+                val playScale by animateFloatAsState(
+                    targetValue = if (playPressed) 0.88f else 1f,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessMediumLow,
+                    ),
+                    label = "playScale",
+                )
+                IconButton(
+                    onClick = onTogglePlayPause,
+                    interactionSource = playInteraction,
+                    modifier = Modifier.size(42.dp),
                 ) {
-                    IconButton(onClick = onToggleShuffle, modifier = Modifier.size(32.dp)) {
-                        Icon(
-                            PlayerIcons.Shuffle,
-                            contentDescription = "Shuffle",
-                            tint = if (snap.isShuffle) GlassColors.Accent else NavDim,
-                            modifier = Modifier.size(16.dp),
-                        )
-                    }
-                    IconButton(onClick = onPrevious, modifier = Modifier.size(36.dp)) {
-                        Icon(
-                            PlayerIcons.SkipPrev,
-                            contentDescription = "Previous",
-                            tint = GlassColors.TextPrimary,
-                            modifier = Modifier.size(18.dp),
-                        )
-                    }
                     Box(
                         modifier = Modifier
-                            .size(38.dp)
+                            .fillMaxSize()
+                            .graphicsLayer { scaleX = playScale; scaleY = playScale }
                             .clip(CircleShape)
-                            .background(GlassColors.Accent)
-                            .clickable { onTogglePlayPause() },
+                            .background(GlassColors.Accent),
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
                             if (snap.isPlaying) PlayerIcons.Pause else PlayerIcons.Play,
                             contentDescription = if (snap.isPlaying) "Pause" else "Play",
                             tint = Color.White,
-                            modifier = Modifier.size(18.dp),
-                        )
-                    }
-                    IconButton(onClick = onNext, modifier = Modifier.size(36.dp)) {
-                        Icon(
-                            PlayerIcons.SkipNext,
-                            contentDescription = "Next",
-                            tint = GlassColors.TextPrimary,
-                            modifier = Modifier.size(18.dp),
-                        )
-                    }
-                    IconButton(onClick = onToggleRepeat, modifier = Modifier.size(32.dp)) {
-                        Icon(
-                            PlayerIcons.Repeat,
-                            contentDescription = "Repeat",
-                            tint = if (snap.isRepeat) GlassColors.Accent else NavDim,
-                            modifier = Modifier.size(16.dp),
+                            modifier = Modifier.size(20.dp),
                         )
                     }
                 }
-            }
 
-            // Scrubber Bar
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(formatDuration(snap.positionMs), fontSize = 11.sp, color = GlassColors.TextMuted)
-                Slider(
-                    value = snap.positionMs.toFloat(),
-                    onValueChange = { onSeek(it.toLong()) },
-                    valueRange = 0f..(snap.durationMs.coerceAtLeast(1L)).toFloat(),
-                    modifier = Modifier.weight(1f).height(12.dp),
-                    colors = SliderDefaults.colors(
-                        thumbColor = GlassColors.TextPrimary,
-                        activeTrackColor = GlassColors.Accent,
-                        inactiveTrackColor = GlassColors.Border,
-                    ),
+                SpringIconButton(
+                    icon = PlayerIcons.SkipNext,
+                    description = "Next",
+                    iconSize = 20.dp,
+                    onClick = onNext,
                 )
-                Text(formatDuration(snap.durationMs), fontSize = 11.sp, color = GlassColors.TextMuted)
+                SpringIconButton(
+                    icon = PlayerIcons.Repeat,
+                    description = "Repeat",
+                    tint = if (snap.isRepeat) GlassColors.Accent else NavDim,
+                    iconSize = 17.dp,
+                    onClick = onToggleRepeat,
+                )
             }
         }
+    }
+}
+
+/** Transport button that sinks under the finger with a spring, like Convx's icon clicks. */
+@Composable
+private fun SpringIconButton(
+    icon: ImageVector,
+    description: String,
+    tint: Color = GlassColors.TextPrimary,
+    iconSize: Dp = 18.dp,
+    onClick: () -> Unit,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val isPressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.85f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMediumLow,
+        ),
+        label = "iconSpringScale",
+    )
+    IconButton(
+        onClick = onClick,
+        interactionSource = interaction,
+        modifier = Modifier
+            .size(34.dp)
+            .graphicsLayer { scaleX = scale; scaleY = scale },
+    ) {
+        Icon(
+            icon,
+            contentDescription = description,
+            tint = tint,
+            modifier = Modifier.size(iconSize),
+        )
     }
 }
 
@@ -1522,6 +1664,22 @@ fun AddToPlaylistDialog(
         containerColor = GlassColors.Surface,
     )
 }
+
+
+/** Desktop-safe pointer enter/exit wiring for hover states. */
+fun Modifier.hoverChanged(entered: Boolean = true, onHover: () -> Unit): Modifier =
+    pointerInput(entered) {
+        awaitPointerEventScope {
+            while (true) {
+                val event = awaitPointerEvent()
+                if ((event.type == PointerEventType.Enter && entered) ||
+                    (event.type == PointerEventType.Exit && !entered)
+                ) {
+                    onHover()
+                }
+            }
+        }
+    }
 
 private fun formatDuration(ms: Long): String {
     val totalSec = ms / 1000

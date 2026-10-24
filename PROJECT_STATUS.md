@@ -1,11 +1,25 @@
 # Local Music Player — Project Status
 
-Last updated: 2026-10-24 (Phase 2 desktop sidebar and vector-icon pass)
+Last updated: 2026-10-24 (Convx liquid-glass visual pass; verified on screen with a playing track)
 
 ## Current phase
 
-**Phase 2 — desktop Dark Glass theme, sidebar shell and vector icons (implemented; compile only).**
+**Phase 2 — Convx liquid-glass restyle (implemented and verified visually against Convx's source).**
 Phase 1 runtime gate below is still open.
+
+## Phase 2 — Convx liquid-glass pass (2026-10-24)
+
+- Ported Convx's `MeshGradientBackground` algorithm from its source (`github.com/cosmictaserdev-creator/Convx`): four artwork-derived colour blobs drifting on sinusoidal anchors under a heavy blur, laid over a hue-matched near-black base — replacing the earlier static low-contrast mesh. The whole backdrop re-tunes when the playing track changes.
+- `glassPanel` now carries real lift: soft directional shadow plus a specular top-edge highlight that fades down the panel.
+- Sidebar and main content are two separate floating rounded glass islands (16 dp radius) with ambient mesh flowing around them; every list/row/shelf surface is translucent so the artwork glow refracts through.
+- Dock rebuilt to the Convx `AppleMiniPlayer` capsule: 64 dp glass pill, 40 dp artwork, 15 sp semibold title with tight tracking, 11 sp muted artist (both marquee), heart toggle, vector transport, and the Convx signature 3 dp playback strip along the dock's bottom edge with drag-to-seek.
+- Startup flags added to `Main.kt`: `desktopApp <musicDir>` boots the library straight from a folder (no JFileChooser), and `--play` also starts the first track once scanning finishes.
+- Sidebar header now derives the folder name from the loaded library (`TrackView.id` is the file path) instead of picker-local state, so it no longer shows "No library loaded" after a bootstrap or restarted session.
+- Verified on screen with a synthetic 8-track library in `/tmp/sv-test-library` (tagged MP3s with embedded covers, generated via ffmpeg): loaded library, playing-row accent highlight, Queue live count (7), artwork-driven magenta mesh, and the dock capsule + progress strip all render as intended.
+- Compile: `./gradlew :desktopApp:compileKotlin --console=plain` — **PASS**.
+- Not verified: hover-press transitions (cursor interaction still pending in the scripted harness) and the seek-drag gesture in the running app.
+
+## Phase 2 — sidebar shell and vector icons (2026-10-24)
 
 ## Phase 2 — sidebar shell and vector icons (2026-10-24)
 
