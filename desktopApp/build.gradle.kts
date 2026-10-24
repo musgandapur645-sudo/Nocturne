@@ -21,7 +21,7 @@ compose.desktop {
             // Windows and Linux packaging; Phase 0 proves the pipeline with an app image
             // (.deb needs dpkg-deb, which Arch doesn't ship; MSI/EXE need a Windows host)
             targetFormats(TargetFormat.Msi, TargetFormat.Exe, TargetFormat.Deb, TargetFormat.AppImage)
-            packageName = "local-music-player"
+            packageName = "nocturne"
             packageVersion = "0.1.0"
         }
     }

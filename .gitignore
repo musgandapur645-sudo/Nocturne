@@ -19,3 +19,7 @@ Thumbs.db
 
 # Art cache (generated at runtime)
 art_cache/
+
+# Spike run artifacts (local paths, regenerated)
+spikes/*.log
+spikes/ui.xml

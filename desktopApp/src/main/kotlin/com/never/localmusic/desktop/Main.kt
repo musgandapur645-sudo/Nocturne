@@ -119,7 +119,7 @@ fun main(args: Array<String>) = application {
             player.dispose()
             exitApplication()
         },
-        title = "SoundVault",
+        title = "Nocturne",
         state = rememberWindowState(width = 1120.dp, height = 820.dp),
     ) {
         DarkGlassTheme {
@@ -142,7 +142,7 @@ private val navTitles = listOf(
 private val NavIdle = Color(0xFF94A3B8)
 private val NavDim = Color(0xFF64748B)
 
-/** Displayed under the SoundVault logo; TrackView.id is the absolute file path. */
+/** Displayed under the Nocturne logo; TrackView.id is the absolute file path. */
 private fun LibraryFolderName(library: List<TrackView>): String {
     val folder = library.firstOrNull()?.let { File(it.id).parentFile } ?: return "No library loaded"
     return folder.name
@@ -213,7 +213,7 @@ fun LocalMusicApp(player: DesktopLocalPlayer) {
                         }
                         Column {
                             Text(
-                                "SoundVault",
+                                "Nocturne",
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = GlassColors.TextPrimary,

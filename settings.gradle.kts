@@ -1,4 +1,4 @@
-rootProject.name = "local-music-player"
+rootProject.name = "nocturne"
 
 include(":shared")
 include(":androidApp")
