@@ -26,6 +26,16 @@ Phase 1 runtime gate below is still open.
 - Compile: `./gradlew :desktopApp:compileKotlin --console=plain` — **PASS**, 7 actionable tasks (5 executed, 2 up to date), BUILD SUCCESSFUL in 13s. One warning: `loadImageBitmap` is deprecated in favour of Compose resources, which cannot load arbitrary runtime files; the call is intentional.
 - Not verified at runtime: no track with embedded art has been scanned or seen on screen yet, and the fallback path was not exercised interactively.
 
+## Phase 2 — artist, album and queue browsing (2026-10-24)
+
+- Navigation now has seven pills: Home, Artists, Albums, Queue, Playlists, Favorites, History.
+- `ArtistsView` groups the library by tag artist (`Unknown Artist` fallback), sorted case-insensitively, and expands an artist in place to list their tracks. Each row uses the first track's cached art as a round thumbnail.
+- `AlbumsView` groups by tag album (`Unknown Album` fallback) with the same expand-in-place pattern, showing the most common track artist or "Various Artists" for compilations.
+- `QueueView` shows the current track under "Now Playing" and the remaining queue from `snap.queue`, with a Clear Queue action wired to `player.clearQueue()`.
+- No playback, folder picking, persistence, `Theme.kt`, or `DesktopLocalPlayer` code was changed; these views only read the existing snapshot.
+- Compile: `./gradlew :desktopApp:compileKotlin --console=plain` — **PASS**, 7 actionable tasks (3 executed, 4 up to date), BUILD SUCCESSFUL in 8s. The only warning is the known `loadImageBitmap` deprecation.
+- Not verified at runtime: expand/collapse, queue ordering, and the seven-pill row width at 860 dp were not exercised interactively.
+
 ## Desktop runtime follow-up (eighth pass)
 
 - Runtime inspection found that opening the blocking `JFileChooser` directly from the Compose click handler could crash the desktop UI.

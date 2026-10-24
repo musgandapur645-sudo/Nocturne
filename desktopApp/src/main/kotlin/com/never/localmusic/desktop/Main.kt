@@ -175,7 +175,8 @@ fun LocalMusicApp(player: DesktopLocalPlayer) {
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                listOf("Home & Library", "Playlists", "Favorites", "History").forEachIndexed { index, label ->
+                listOf("Home", "Artists", "Albums", "Queue", "Playlists", "Favorites", "History")
+                    .forEachIndexed { index, label ->
                     val isSelected = selectedNav == index
                     Box(
                         modifier = Modifier
@@ -208,18 +209,31 @@ fun LocalMusicApp(player: DesktopLocalPlayer) {
                         onToggleFav = { player.toggleFavorite(it) },
                         onAddToPlaylist = if (snap.playlists.isEmpty()) null else { { addToPlaylistTrack = it } },
                     )
-                    1 -> PlaylistsView(
+                    1 -> ArtistsView(
+                        snap = snap,
+                        onPlay = { player.playSelected(it) },
+                    )
+                    2 -> AlbumsView(
+                        snap = snap,
+                        onPlay = { player.playSelected(it) },
+                    )
+                    3 -> QueueView(
+                        snap = snap,
+                        onPlay = { player.playSelected(it) },
+                        onClearQueue = { player.clearQueue() },
+                    )
+                    4 -> PlaylistsView(
                         snap = snap,
                         onCreatePlaylist = { showNewPlaylistDialog = true },
                         onPlayPlaylist = { player.playPlaylist(it) },
                         onDeletePlaylist = { player.deletePlaylist(it) },
                     )
-                    2 -> FavoritesView(
+                    5 -> FavoritesView(
                         snap = snap,
                         onPlay = { player.playSelected(it) },
                         onToggleFav = { player.toggleFavorite(it) },
                     )
-                    3 -> HistoryView(
+                    6 -> HistoryView(
                         snap = snap,
                         onPlay = { trackId ->
                             snap.library.firstOrNull { it.id == trackId }?.let { player.playSelected(it) }
@@ -434,6 +448,370 @@ fun HomeLibraryView(
 
                     IconButton(onClick = { onToggleFav(track.id) }, modifier = Modifier.size(28.dp)) {
                         Text(if (isFav) "\u2764\uFE0F" else "\uD83E\uDD0D", fontSize = 14.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ArtistsView(
+    snap: LocalPlayerSnapshot,
+    onPlay: (TrackView) -> Unit,
+) {
+    val artistGroups = remember(snap.library) {
+        snap.library.groupBy { it.artist ?: "Unknown Artist" }
+            .toSortedMap(String.CASE_INSENSITIVE_ORDER)
+    }
+    var expandedArtist by remember { mutableStateOf<String?>(null) }
+
+    LazyColumn(
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(bottom = 20.dp),
+    ) {
+        item {
+            Text(
+                "Artists (${artistGroups.size})",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = GlassColors.TextPrimary,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+        }
+
+        artistGroups.forEach { (artist, tracks) ->
+            val isExpanded = expandedArtist == artist
+
+            item(key = "artist-$artist") {
+                Column {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .glassPanel(cornerRadius = 12.dp)
+                            .clickable { expandedArtist = if (isExpanded) null else artist }
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            // Artist icon using first track's art
+                            TrackArtwork(
+                                artPath = tracks.firstOrNull()?.artPath,
+                                modifier = Modifier.size(44.dp).clip(RoundedCornerShape(22.dp)),
+                                fallbackIconSize = 18.sp,
+                            )
+                            Column {
+                                Text(
+                                    artist,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = GlassColors.TextPrimary,
+                                )
+                                Text(
+                                    "${tracks.size} track${if (tracks.size != 1) "s" else ""}",
+                                    fontSize = 12.sp,
+                                    color = GlassColors.TextSecondary,
+                                )
+                            }
+                        }
+                        Text(
+                            if (isExpanded) "\u25B2" else "\u25BC",
+                            color = GlassColors.TextMuted,
+                            fontSize = 12.sp,
+                        )
+                    }
+
+                    if (isExpanded) {
+                        Column(
+                            modifier = Modifier.padding(start = 20.dp, top = 6.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            tracks.forEach { track ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .glassPanel(cornerRadius = 8.dp, backgroundColor = GlassColors.Surface)
+                                        .clickable { onPlay(track) }
+                                        .padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                ) {
+                                    TrackArtwork(
+                                        artPath = track.artPath,
+                                        modifier = Modifier.size(32.dp).clip(RoundedCornerShape(6.dp)),
+                                        fallbackIconSize = 14.sp,
+                                    )
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            track.title,
+                                            fontSize = 13.sp,
+                                            color = GlassColors.TextPrimary,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                        track.album?.let {
+                                            Text(it, fontSize = 11.sp, color = GlassColors.TextMuted, maxLines = 1)
+                                        }
+                                    }
+                                    Text(
+                                        formatDuration(track.durationMs),
+                                        fontSize = 11.sp,
+                                        color = GlassColors.TextMuted,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AlbumsView(
+    snap: LocalPlayerSnapshot,
+    onPlay: (TrackView) -> Unit,
+) {
+    val albumGroups = remember(snap.library) {
+        snap.library.groupBy { it.album ?: "Unknown Album" }
+            .toSortedMap(String.CASE_INSENSITIVE_ORDER)
+    }
+    var expandedAlbum by remember { mutableStateOf<String?>(null) }
+
+    LazyColumn(
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(bottom = 20.dp),
+    ) {
+        item {
+            Text(
+                "Albums (${albumGroups.size})",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = GlassColors.TextPrimary,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+        }
+
+        albumGroups.forEach { (album, tracks) ->
+            val isExpanded = expandedAlbum == album
+            val albumArtist = tracks.mapNotNull { it.artist }
+                .groupingBy { it }
+                .eachCount()
+                .maxByOrNull { it.value }?.key ?: "Various Artists"
+
+            item(key = "album-$album") {
+                Column {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .glassPanel(cornerRadius = 12.dp)
+                            .clickable { expandedAlbum = if (isExpanded) null else album }
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            TrackArtwork(
+                                artPath = tracks.firstOrNull()?.artPath,
+                                modifier = Modifier.size(52.dp).clip(RoundedCornerShape(8.dp)),
+                                fallbackIconSize = 22.sp,
+                            )
+                            Column {
+                                Text(
+                                    album,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = GlassColors.TextPrimary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Text(
+                                    albumArtist,
+                                    fontSize = 12.sp,
+                                    color = GlassColors.TextSecondary,
+                                    maxLines = 1,
+                                )
+                                Text(
+                                    "${tracks.size} track${if (tracks.size != 1) "s" else ""}",
+                                    fontSize = 11.sp,
+                                    color = GlassColors.TextMuted,
+                                )
+                            }
+                        }
+                        Text(if (isExpanded) "\u25B2" else "\u25BC", color = GlassColors.TextMuted, fontSize = 12.sp)
+                    }
+
+                    if (isExpanded) {
+                        Column(
+                            modifier = Modifier.padding(start = 20.dp, top = 6.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            tracks.forEachIndexed { index, track ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .glassPanel(cornerRadius = 8.dp, backgroundColor = GlassColors.Surface)
+                                        .clickable { onPlay(track) }
+                                        .padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                ) {
+                                    Text(
+                                        "${index + 1}",
+                                        fontSize = 12.sp,
+                                        color = GlassColors.TextMuted,
+                                        modifier = Modifier.width(24.dp),
+                                    )
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            track.title,
+                                            fontSize = 13.sp,
+                                            color = GlassColors.TextPrimary,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                        track.artist?.let {
+                                            Text(it, fontSize = 11.sp, color = GlassColors.TextMuted)
+                                        }
+                                    }
+                                    Text(
+                                        formatDuration(track.durationMs),
+                                        fontSize = 11.sp,
+                                        color = GlassColors.TextMuted,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun QueueView(
+    snap: LocalPlayerSnapshot,
+    onPlay: (TrackView) -> Unit,
+    onClearQueue: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "Up Next (${snap.queue.size})",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = GlassColors.TextPrimary,
+            )
+            if (snap.queue.isNotEmpty()) {
+                OutlinedButton(onClick = onClearQueue, shape = RoundedCornerShape(8.dp)) {
+                    Text("Clear Queue", fontSize = 11.sp)
+                }
+            }
+        }
+
+        // Now Playing highlight
+        snap.nowPlaying?.let { current ->
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    "Now Playing",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = GlassColors.Accent,
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .glassPanel(cornerRadius = 12.dp, borderColor = GlassColors.Accent)
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    TrackArtwork(
+                        artPath = current.artPath,
+                        modifier = Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)),
+                    )
+                    Column {
+                        Text(
+                            current.title,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = GlassColors.Accent,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            current.artist ?: "Unknown Artist",
+                            fontSize = 12.sp,
+                            color = GlassColors.TextSecondary,
+                        )
+                    }
+                }
+            }
+        }
+
+        if (snap.queue.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxWidth().padding(40.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("Queue is empty. Play a track to start.", color = GlassColors.TextMuted)
+            }
+        } else {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                itemsIndexed(snap.queue, key = { i, t -> "${t.id}-$i" }) { index, track ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .glassPanel(cornerRadius = 10.dp)
+                            .clickable { onPlay(track) }
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Text(
+                            "${index + 1}",
+                            fontSize = 12.sp,
+                            color = GlassColors.TextMuted,
+                            modifier = Modifier.width(28.dp),
+                        )
+                        TrackArtwork(
+                            artPath = track.artPath,
+                            modifier = Modifier.size(36.dp).clip(RoundedCornerShape(6.dp)),
+                            fallbackIconSize = 14.sp,
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                track.title,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = GlassColors.TextPrimary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                track.artist ?: "Unknown",
+                                fontSize = 11.sp,
+                                color = GlassColors.TextSecondary,
+                            )
+                        }
+                        Text(
+                            formatDuration(track.durationMs),
+                            fontSize = 11.sp,
+                            color = GlassColors.TextMuted,
+                        )
                     }
                 }
             }
