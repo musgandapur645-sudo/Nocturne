@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -78,7 +79,7 @@ fun main() = application {
             exitApplication()
         },
         title = "Local Music Player",
-        state = rememberWindowState(width = 860.dp, height = 780.dp),
+        state = rememberWindowState(width = 1060.dp, height = 780.dp),
     ) {
         DarkGlassTheme {
             Box(modifier = Modifier.fillMaxSize().background(GlassColors.Background)) {
@@ -87,6 +88,23 @@ fun main() = application {
         }
     }
 }
+
+private data class NavItem(val icon: String, val label: String)
+
+private val browseNavItems = listOf(
+    NavItem("\uD83C\uDFE0", "Home"),
+    NavItem("\uD83C\uDFA4", "Artists"),
+    NavItem("\uD83D\uDCBF", "Albums"),
+    NavItem("\uD83D\uDCCB", "Queue"),
+)
+
+private val libraryNavItems = listOf(
+    NavItem("\uD83C\uDFB5", "Playlists"),
+    NavItem("\u2764\uFE0F", "Favorites"),
+    NavItem("\u23F1", "History"),
+)
+
+private val navTitles = listOf("Home", "Artists", "Albums", "Queue", "Playlists", "Favorites", "History")
 
 @Composable
 fun LocalMusicApp(player: DesktopLocalPlayer) {
@@ -99,33 +117,121 @@ fun LocalMusicApp(player: DesktopLocalPlayer) {
     var addToPlaylistTrack by remember { mutableStateOf<TrackView?>(null) }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        Column(modifier = Modifier.fillMaxSize().padding(bottom = 96.dp)) {
-            // Header with App Title, Search & Folder Picker
-            Row(
+        Row(modifier = Modifier.fillMaxSize().padding(bottom = 88.dp)) {
+
+            // ── Left Sidebar ──
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 18.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
+                    .width(220.dp)
+                    .fillMaxHeight()
+                    .background(GlassColors.Surface)
+                    .padding(vertical = 20.dp),
+                verticalArrangement = Arrangement.SpaceBetween,
             ) {
-                Column {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    // App Logo
                     Text(
                         "SoundVault",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = GlassColors.Accent,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                    )
+                    Text(
+                        folderName?.let { "Folder: $it" } ?: "No folder selected",
+                        fontSize = 11.sp,
+                        color = GlassColors.TextMuted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(horizontal = 20.dp),
+                    )
+
+                    HorizontalDivider(
+                        color = GlassColors.Border,
+                        modifier = Modifier.padding(vertical = 8.dp),
+                    )
+
+                    // Nav section label
+                    Text(
+                        "BROWSE",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = GlassColors.TextMuted,
+                        letterSpacing = 1.5.sp,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
+                    )
+
+                    // Nav items
+                    browseNavItems.forEachIndexed { index, item ->
+                        SidebarNavItem(
+                            icon = item.icon,
+                            label = item.label,
+                            isSelected = selectedNav == index,
+                            onClick = { selectedNav = index },
+                        )
+                    }
+
+                    HorizontalDivider(
+                        color = GlassColors.Border,
+                        modifier = Modifier.padding(vertical = 8.dp),
+                    )
+
+                    Text(
+                        "LIBRARY",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = GlassColors.TextMuted,
+                        letterSpacing = 1.5.sp,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
+                    )
+
+                    libraryNavItems.forEachIndexed { index, item ->
+                        SidebarNavItem(
+                            icon = item.icon,
+                            label = item.label,
+                            isSelected = selectedNav == index + 4,
+                            onClick = { selectedNav = index + 4 },
+                        )
+                    }
+                }
+
+                // Open Folder button at the bottom
+                Button(
+                    onClick = {
+                        scope.launch(Dispatchers.IO) {
+                            val folder = chooseFolder()
+                            if (folder != null) withContext(Dispatchers.Main) {
+                                folderName = folder.name
+                                player.updateSelectedFolder(folder)
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = GlassColors.Accent),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                ) {
+                    Text("\uD83D\uDCC2  Open Folder", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+
+            // ── Main Content ──
+            Column(modifier = Modifier.fillMaxSize()) {
+                // Top bar with search
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    // Current view title
+                    Text(
+                        navTitles[selectedNav],
                         fontSize = 22.sp,
                         fontWeight = FontWeight.Bold,
                         color = GlassColors.TextPrimary,
                     )
-                    Text(
-                        folderName?.let { "Folder: $it" } ?: "No folder selected",
-                        fontSize = 12.sp,
-                        color = GlassColors.TextMuted,
-                    )
-                }
 
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = {
@@ -133,14 +239,10 @@ fun LocalMusicApp(player: DesktopLocalPlayer) {
                             player.search(it)
                         },
                         placeholder = {
-                            Text(
-                                "Search songs, artists...",
-                                color = GlassColors.TextMuted,
-                                fontSize = 13.sp,
-                            )
+                            Text("Search...", color = GlassColors.TextMuted, fontSize = 13.sp)
                         },
                         singleLine = true,
-                        modifier = Modifier.width(260.dp).height(48.dp),
+                        modifier = Modifier.width(280.dp).height(46.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = GlassColors.Accent,
                             unfocusedBorderColor = GlassColors.Border,
@@ -149,105 +251,61 @@ fun LocalMusicApp(player: DesktopLocalPlayer) {
                             focusedTextColor = GlassColors.TextPrimary,
                             unfocusedTextColor = GlassColors.TextPrimary,
                         ),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(10.dp),
                     )
-
-                    Button(
-                        onClick = {
-                            scope.launch(Dispatchers.IO) {
-                                val folder = chooseFolder()
-                                if (folder != null) withContext(Dispatchers.Main) {
-                                    folderName = folder.name
-                                    player.updateSelectedFolder(folder)
-                                }
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = GlassColors.Accent),
-                        shape = RoundedCornerShape(12.dp),
-                    ) {
-                        Text("Open Folder", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                    }
                 }
-            }
 
-            // Navigation Pills (Home, Playlists, Favorites, History)
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                listOf("Home", "Artists", "Albums", "Queue", "Playlists", "Favorites", "History")
-                    .forEachIndexed { index, label ->
-                    val isSelected = selectedNav == index
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(if (isSelected) GlassColors.Accent else GlassColors.Surface)
-                            .clickable { selectedNav = index }
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                    ) {
-                        Text(
-                            label,
-                            color = if (isSelected) Color.White else GlassColors.TextSecondary,
-                            fontSize = 13.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                HorizontalDivider(color = GlassColors.Border)
+
+                // View content
+                Box(modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 12.dp)) {
+                    when (selectedNav) {
+                        0 -> HomeLibraryView(
+                            snap = snap,
+                            onPlay = { player.playSelected(it) },
+                            onToggleFav = { player.toggleFavorite(it) },
+                            onAddToPlaylist = if (snap.playlists.isEmpty()) null else { { addToPlaylistTrack = it } },
+                        )
+                        1 -> ArtistsView(
+                            snap = snap,
+                            onPlay = { player.playSelected(it) },
+                        )
+                        2 -> AlbumsView(
+                            snap = snap,
+                            onPlay = { player.playSelected(it) },
+                        )
+                        3 -> QueueView(
+                            snap = snap,
+                            onPlay = { player.playSelected(it) },
+                            onClearQueue = { player.clearQueue() },
+                        )
+                        4 -> PlaylistsView(
+                            snap = snap,
+                            onCreatePlaylist = { showNewPlaylistDialog = true },
+                            onPlayPlaylist = { player.playPlaylist(it) },
+                            onDeletePlaylist = { player.deletePlaylist(it) },
+                        )
+                        5 -> FavoritesView(
+                            snap = snap,
+                            onPlay = { player.playSelected(it) },
+                            onToggleFav = { player.toggleFavorite(it) },
+                        )
+                        6 -> HistoryView(
+                            snap = snap,
+                            onPlay = { trackId ->
+                                snap.library.firstOrNull { it.id == trackId }?.let { player.playSelected(it) }
+                            },
+                            onPause = { player.pauseHistory() },
+                            onResume = { player.resumeHistory() },
+                            onClear = { player.clearHistory() },
                         )
                     }
-                }
-            }
-
-            HorizontalDivider(
-                color = GlassColors.Border,
-                modifier = Modifier.padding(top = 10.dp, bottom = 12.dp),
-            )
-
-            // Main Content Area
-            Box(modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp)) {
-                when (selectedNav) {
-                    0 -> HomeLibraryView(
-                        snap = snap,
-                        onPlay = { player.playSelected(it) },
-                        onToggleFav = { player.toggleFavorite(it) },
-                        onAddToPlaylist = if (snap.playlists.isEmpty()) null else { { addToPlaylistTrack = it } },
-                    )
-                    1 -> ArtistsView(
-                        snap = snap,
-                        onPlay = { player.playSelected(it) },
-                    )
-                    2 -> AlbumsView(
-                        snap = snap,
-                        onPlay = { player.playSelected(it) },
-                    )
-                    3 -> QueueView(
-                        snap = snap,
-                        onPlay = { player.playSelected(it) },
-                        onClearQueue = { player.clearQueue() },
-                    )
-                    4 -> PlaylistsView(
-                        snap = snap,
-                        onCreatePlaylist = { showNewPlaylistDialog = true },
-                        onPlayPlaylist = { player.playPlaylist(it) },
-                        onDeletePlaylist = { player.deletePlaylist(it) },
-                    )
-                    5 -> FavoritesView(
-                        snap = snap,
-                        onPlay = { player.playSelected(it) },
-                        onToggleFav = { player.toggleFavorite(it) },
-                    )
-                    6 -> HistoryView(
-                        snap = snap,
-                        onPlay = { trackId ->
-                            snap.library.firstOrNull { it.id == trackId }?.let { player.playSelected(it) }
-                        },
-                        onPause = { player.pauseHistory() },
-                        onResume = { player.resumeHistory() },
-                        onClear = { player.clearHistory() },
-                    )
                 }
             }
         }
 
         // Floating Glass Now Playing Bar at the Bottom
-        Box(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(16.dp)) {
+        Box(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(12.dp)) {
             FloatingNowPlayingBar(
                 snap = snap,
                 onTogglePlayPause = { player.togglePlayPause() },
@@ -276,6 +334,34 @@ fun LocalMusicApp(player: DesktopLocalPlayer) {
                 },
             )
         }
+    }
+}
+
+@Composable
+fun SidebarNavItem(
+    icon: String,
+    label: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 1.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (isSelected) GlassColors.GlassCardHover else Color.Transparent)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(icon, fontSize = 16.sp)
+        Text(
+            label,
+            fontSize = 13.sp,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+            color = if (isSelected) GlassColors.TextPrimary else GlassColors.TextSecondary,
+        )
     }
 }
 
