@@ -23,3 +23,7 @@ art_cache/
 # Spike run artifacts (local paths, regenerated)
 spikes/*.log
 spikes/ui.xml
+
+# Build artifacts for jar distribution (regenerated via gradle)
+lib/
+META-INF/

@@ -57,6 +57,11 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
@@ -99,6 +104,10 @@ fun main(args: Array<String>) = application {
             DesktopMain.chooseFolder = { chooseFolder() }
         }
     }
+    // Track whether the search field owns keyboard focus so the window-level
+    // Space shortcut below can yield to it while typing.
+    val searchFocus = remember { SearchFocusFlag() }
+
     // Optional startup folder: `desktopApp <musicDir> [--play]` boots the library
     // directly, skipping the JFileChooser dialog; --play also starts the first track.
     LaunchedEffect(Unit) {
@@ -121,11 +130,25 @@ fun main(args: Array<String>) = application {
         },
         title = "Nocturne",
         state = rememberWindowState(width = 1120.dp, height = 820.dp),
+        // Window level so the shortcut works no matter which internal node has
+        // focus. Global Space = play/pause, skipped while typing in search —
+        // mirroring Spotify/Convx.
+        onKeyEvent = { event ->
+            if (event.type == KeyEventType.KeyDown && event.key == Key.Spacebar && !searchFocus.active) {
+                player.togglePlayPause()
+                true
+            } else false
+        },
     ) {
         DarkGlassTheme {
-            LocalMusicApp(player)
+            LocalMusicApp(player, searchFocus)
         }
     }
+}
+
+/** Shared flag: does the search text field currently own keyboard focus? */
+class SearchFocusFlag {
+    var active by mutableStateOf(false)
 }
 
 private val navTitles = listOf(
@@ -149,7 +172,7 @@ private fun LibraryFolderName(library: List<TrackView>): String {
 }
 
 @Composable
-fun LocalMusicApp(player: DesktopLocalPlayer) {
+fun LocalMusicApp(player: DesktopLocalPlayer, searchFocus: SearchFocusFlag) {
     val snap by player.snapshotFlow.collectAsState()
     val scope = rememberCoroutineScope()
     var selectedNav by rememberSaveable { mutableStateOf(0) }
@@ -157,7 +180,11 @@ fun LocalMusicApp(player: DesktopLocalPlayer) {
     var showNewPlaylistDialog by remember { mutableStateOf(false) }
     var addToPlaylistTrack by remember { mutableStateOf<TrackView?>(null) }
 
-    Box(modifier = Modifier.fillMaxSize().background(GlassColors.Background)) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(GlassColors.Background),
+    ) {
         // Convx ambient mesh: four artwork-derived blobs drifting under a heavy blur.
         // All panels below are translucent, so this color field is what they refract.
         ConvxMeshBackground(
@@ -343,8 +370,8 @@ fun LocalMusicApp(player: DesktopLocalPlayer) {
                         },
                         placeholder = {
                             Text(
-                                "Search songs, artists, albums...",
-                                color = NavDim,
+                                "Search songs, artists, albums\u2026",
+                                color = NavIdle,
                                 fontSize = 13.sp,
                             )
                         },
@@ -352,12 +379,16 @@ fun LocalMusicApp(player: DesktopLocalPlayer) {
                             Icon(
                                 PlayerIcons.Search,
                                 contentDescription = null,
-                                tint = NavDim,
+                                tint = NavIdle,
                                 modifier = Modifier.size(18.dp),
                             )
                         },
                         singleLine = true,
-                        modifier = Modifier.width(320.dp).height(44.dp),
+                        // No fixed height: OutlinedTextField's default content
+                        // padding clips the placeholder at 44dp.
+                        modifier = Modifier
+                            .width(320.dp)
+                            .onFocusChanged { searchFocus.active = it.hasFocus },
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = GlassColors.Accent,
                             unfocusedBorderColor = Color(0x28FFFFFF),
@@ -462,6 +493,7 @@ fun SidebarNavItem(
     onClick: () -> Unit,
 ) {
     var isHovered by remember { mutableStateOf(false) }
+    var isFocused by remember { mutableStateOf(false) }
 
     Row(
         modifier = Modifier
@@ -485,6 +517,12 @@ fun SidebarNavItem(
                     )
                 }
             }
+            // Keyboard focus ring: instant, never animated (craft floor).
+            .then(
+                if (isFocused) Modifier.border(1.5.dp, GlassColors.Accent, RoundedCornerShape(10.dp))
+                else Modifier
+            )
+            .onFocusChanged { isFocused = it.hasFocus }
             .hoverChanged { isHovered = true }
             .hoverChanged(false) { isHovered = false }
             .clickable(onClick = onClick)
@@ -541,13 +579,18 @@ fun HomeLibraryView(
     val tracks = if (snap.searchQuery.isBlank()) snap.library else snap.filteredLibrary
 
     LazyColumn(
-        verticalArrangement = Arrangement.spacedBy(20.dp),
+        // Rows carry their own 8dp padding; keep list rhythm tight so the
+        // tracks read as one list, not as separated cards.
+        verticalArrangement = Arrangement.spacedBy(2.dp),
         contentPadding = PaddingValues(bottom = 20.dp),
     ) {
         // Shelf 1: "Jump Back In" (Recent from History)
         if (snap.history.isNotEmpty()) {
             item {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.padding(top = 4.dp, bottom = 14.dp),
+                ) {
                     Text(
                         "Jump Back In",
                         fontSize = 17.sp,
@@ -605,7 +648,7 @@ fun HomeLibraryView(
         // Shelf 2: All Songs Header
         item {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -627,7 +670,7 @@ fun HomeLibraryView(
                 ) {
                     Text(
                         if (snap.library.isEmpty())
-                            "No audio tracks found. Click 'Open Folder' to scan your music."
+                            "No audio tracks found. Click \u2018Open Folder\u2019 to scan your music."
                         else
                             "No tracks match \u201c${snap.searchQuery}\u201d.",
                         color = GlassColors.TextMuted,
