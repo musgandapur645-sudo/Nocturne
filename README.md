@@ -25,6 +25,46 @@ Requires JDK 21+.
 ./gradlew :androidApp:assembleDebug
 ```
 
+## Distribution jars
+
+Two runnable jars are produced from the desktop module:
+
+```bash
+# Build both jars
+./gradlew :desktopApp:runnableJar :desktopApp:thinJar
+```
+
+| Jar | Size | Contents | Run |
+| --- | --- | --- | --- |
+| `desktopApp-runnable.jar` | ~40 MB | Classes + all runtime dependencies (self-contained) | `java -jar desktopApp/build/libs/desktopApp-runnable.jar` |
+| `desktopApp-thin.jar` | ~250 KB | Classes only; needs the dependency jars on the classpath | See below |
+
+### Running the thin jar
+
+The thin jar is useful when you want to redistribute only the application code and keep the dependency jars separate (for example, to avoid re-packaging unchanged dependencies on every build).
+
+```bash
+# Copy the runtime dependencies to lib/
+./gradlew :desktopApp:copyDependencies -PdestDir=lib
+
+# Run with an explicit classpath
+java -cp "lib/*:desktopApp/build/libs/desktopApp-thin.jar" com.never.localmusic.desktop.MainKt
+
+# Or package lib/ alongside the jar and use -jar
+java -jar desktopApp/build/libs/desktopApp-thin.jar
+```
+
+The `Class-Path` manifest attribute in `desktopApp-thin.jar` is pre-populated from the current `runtimeClasspath`, so `java -jar` works when the dependency jars are in a `lib/` directory next to the jar.
+
+A ready-to-run packaged layout can be assembled with:
+
+```bash
+mkdir -p dist
+cp desktopApp/build/libs/desktopApp-thin.jar dist/
+cp -r lib dist/
+# distribute dist/ as a zip or tar
+```
+
 ## Status
 
 The desktop local player (scan, playback, playlists, favorites, history, search) is implemented and visually verified. Android compiles; on-device behavior and the customization phase (theme presets, accent color, glass intensity, settings import/export) are in progress.
