@@ -1,6 +1,6 @@
 # Local Music Player — Project Status
 
-Last updated: 2026-10-24 (Convx liquid-glass visual pass; verified on screen with a playing track)
+Last updated: 2026-10-26 (fat + thin jar packaging verified; Space shortcut and UI spacing refinements committed)
 
 ## Current phase
 
@@ -234,11 +234,32 @@ The gate remains open until an interactive smoke pass verifies folder selection,
 
 ---
 
+## Phase 3 — jar packaging and desktop distribution (2026-10-26)
+
+- Added two Gradle jar tasks to `desktopApp/build.gradle.kts`:
+  - `runnableJar`: fat, self-contained jar (40 MB) that bundles all runtime dependencies; runs with `java -jar desktopApp/build/libs/desktopApp-runnable.jar`.
+  - `thinJar`: classes-only jar (252 KB) with a `Class-Path` manifest attribute pointing at `lib/*.jar`; runs with an explicit classpath or with `java -jar` when `lib/` is alongside the jar.
+- Added `copyDependencies` task to populate a `lib/` directory from `runtimeClasspath`; 58 dependency jars are copied.
+- Verified both jars launch the app and render the full Nocturne UI from the fat jar screenshot.
+- Added `lib/` and `META-INF/` to `.gitignore` so regenerated distribution artifacts are not committed.
+- Committed as `ca79949 feat(desktop): add keyboard shortcuts and fine-tune UI spacing`.
+
+## Desktop UI refinements (2026-10-26)
+
+- Added a global Space = play/pause shortcut on the window; the shortcut yields while the search field owns keyboard focus, mirroring Spotify/Convx.
+- Added a quiet keyboard focus ring on sidebar nav items (1.5 dp accent border, instant, never animated).
+- Tightened the Home library list spacing so rows read as one list rather than separated cards.
+- Removed the fixed height on the search `OutlinedTextField` so the placeholder no longer clips.
+- Swapped ASCII `...` and straight quotes for typographic equivalents (`…`, `‘`, `’`, `“`, `”`) in user-facing strings.
+- Deleted the unused experimental `SpikeScreen.kt`.
+- Verified on screen from the fat jar: app launches, shows the "No library loaded" state, and renders all navigation sections and the bottom player bar.
+
 ## Next step
 
-1. Re-run the desktop smoke after GUI control is available: confirm the folder lists MP3/OGG and skips FLAC, play MP3/OGG, and check the error message with a missing or invalid listed file.
-2. Re-run the Android smoke pass when an emulator or device is responsive: folder selection, playback, persistence across restart, and background playback.
-3. Test playlist creation and the History pause/clear controls in an interactive flow.
+1. Package the thin jar as a distributable zip (`desktopApp-thin.jar` + `lib/`) and verify `java -jar` from the packaged layout.
+2. Re-run the desktop smoke after GUI control is available: confirm the folder lists MP3/OGG and skips FLAC, play MP3/OGG, and check the error message with a missing or invalid listed file.
+3. Re-run the Android smoke pass when an emulator or device is responsive: folder selection, playback, persistence across restart, and background playback.
+4. Test playlist creation and the History pause/clear controls in an interactive flow.
 
 ## Desktop runtime recheck (2026-10-23)
 
