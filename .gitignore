@@ -27,3 +27,7 @@ spikes/ui.xml
 # Build artifacts for jar distribution (regenerated via gradle)
 lib/
 META-INF/
+
+# Distribution packages (regenerated)
+dist/
+nocturne-thin-dist.zip
