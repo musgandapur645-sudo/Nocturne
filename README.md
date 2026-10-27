@@ -44,9 +44,6 @@ Two runnable jars are produced from the desktop module:
 The thin jar is useful when you want to redistribute only the application code and keep the dependency jars separate (for example, to avoid re-packaging unchanged dependencies on every build).
 
 ```bash
-# Copy the runtime dependencies to lib/
-./gradlew :desktopApp:copyDependencies -PdestDir=lib
-
 # Run with an explicit classpath
 java -cp "lib/*:desktopApp/build/libs/desktopApp-thin.jar" com.never.localmusic.desktop.MainKt
 
@@ -56,13 +53,15 @@ java -jar desktopApp/build/libs/desktopApp-thin.jar
 
 The `Class-Path` manifest attribute in `desktopApp-thin.jar` is pre-populated from the current `runtimeClasspath`, so `java -jar` works when the dependency jars are in a `lib/` directory next to the jar.
 
-A ready-to-run packaged layout can be assembled with:
+A ready-to-run zip can be built in one step:
 
 ```bash
-mkdir -p dist
-cp desktopApp/build/libs/desktopApp-thin.jar dist/
-cp -r lib dist/
-# distribute dist/ as a zip or tar
+./gradlew :desktopApp:packageDistributive
+
+desktopApp/nocturne-thin-dist.zip
+# unzips to a nocturne/ folder: nocturne/desktopApp-thin.jar + nocturne/lib/*.jar
+
+cd nocturne && java -jar desktopApp-thin.jar
 ```
 
 ## Status
