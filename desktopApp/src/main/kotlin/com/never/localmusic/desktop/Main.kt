@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -354,12 +355,16 @@ fun LocalMusicApp(player: DesktopLocalPlayer, searchFocus: SearchFocusFlag) {
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    // Current view title
+                    // Current view title. fill=false so it only takes what
+                    // it needs and the search field gets the rest.
                     Text(
                         navTitles[selectedNav],
                         fontSize = 22.sp,
                         fontWeight = FontWeight.Bold,
                         color = GlassColors.TextPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
                     )
 
                     OutlinedTextField(
@@ -373,6 +378,8 @@ fun LocalMusicApp(player: DesktopLocalPlayer, searchFocus: SearchFocusFlag) {
                                 "Search songs, artists, albums\u2026",
                                 color = NavIdle,
                                 fontSize = 13.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                             )
                         },
                         leadingIcon = {
@@ -384,10 +391,12 @@ fun LocalMusicApp(player: DesktopLocalPlayer, searchFocus: SearchFocusFlag) {
                             )
                         },
                         singleLine = true,
-                        // No fixed height: OutlinedTextField's default content
-                        // padding clips the placeholder at 44dp.
+                        // Shared space: takes the room left next to the title,
+                        // capped at 320dp. Never grows vertically: the
+                        // placeholder stays one line and ellipsizes.
                         modifier = Modifier
-                            .width(320.dp)
+                            .weight(1f)
+                            .widthIn(min = 160.dp, max = 320.dp)
                             .onFocusChanged { searchFocus.active = it.hasFocus },
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = GlassColors.Accent,
