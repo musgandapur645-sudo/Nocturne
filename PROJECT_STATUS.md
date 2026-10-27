@@ -254,11 +254,17 @@ The gate remains open until an interactive smoke pass verifies folder selection,
 - Deleted the unused experimental `SpikeScreen.kt`.
 - Verified on screen from the fat jar: app launches, shows the "No library loaded" state, and renders all navigation sections and the bottom player bar.
 
+## Thin-jar distributable (2026-10-27)
+
+- Rewrote `assembleDistributive` as a plain `Copy` into `build/dist` (the old Sync/into wiring produced an empty dist, so `packageDistributive` stayed `NO-SOURCE`).
+- `packageDistributive` now builds `desktopApp/nocturne-thin-dist.zip`, which unzips to `nocturne/desktopApp-thin.jar` + `nocturne/lib/` (58 dependency jars).
+- Fixed the `Class-Path` manifest write (back to `doFirst`; `doLast` runs after the jar is already written) and made `runnableJar`/`thinJar` depend on `compileKotlin` via the source set output instead of a fragile `inputs.dir` check.
+- Verified: zip unpacks and `java -jar nocturne/desktopApp-thin.jar` launches cleanly (launch confirmed via timeout kill, no errors in the log). Requires Java 21.
+
 ## Next step
 
-1. Package the thin jar as a distributable zip (`desktopApp-thin.jar` + `lib/`) and verify `java -jar` from the packaged layout.
-2. Re-run the desktop smoke after GUI control is available: confirm the folder lists MP3/OGG and skips FLAC, play MP3/OGG, and check the error message with a missing or invalid listed file.
-3. Re-run the Android smoke pass when an emulator or device is responsive: folder selection, playback, persistence across restart, and background playback.
+1. Re-run the desktop smoke after GUI control is available: confirm the folder lists MP3/OGG and skips FLAC, play MP3/OGG, and check the error message with a missing or invalid listed file.
+2. Re-run the Android smoke pass when an emulator or device is responsive: folder selection, playback, persistence across restart, and background playback.
 4. Test playlist creation and the History pause/clear controls in an interactive flow.
 
 ## Desktop runtime recheck (2026-10-23)
