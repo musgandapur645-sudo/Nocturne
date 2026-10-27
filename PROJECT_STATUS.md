@@ -272,7 +272,8 @@ Driven both visually (app launched in Hyprland, screenshot-verified) and through
 ## Next step
 
 1. Re-run the Android smoke pass when an emulator or device is responsive: folder selection, playback, persistence across restart, and background playback.
-4. Test playlist creation and the History pause/clear controls in an interactive flow.
+2. Tighten the provisional Android `FileProvider` setup to match the plan's least-privilege rule: remove `root-path` and `external-path`, keep only app-private storage roots, and restrict the provider to the app's own share actions instead of broad file exposure.
+3. Test playlist creation and the History pause/clear controls in an interactive flow.
 
 ## Desktop runtime recheck (2026-10-23)
 

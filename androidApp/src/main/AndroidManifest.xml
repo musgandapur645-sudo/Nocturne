@@ -36,6 +36,21 @@
                 <action android:name="android.media.browse.MediaBrowserService" />
             </intent-filter>
         </service>
+
+        <!-- Share only app-private files the app itself creates for a share action
+             (for example exported settings or cached artwork), never the user-chosen music folder.
+             Music-folder access returned from the system picker is retained through the SAF grant,
+             and shared through that grant URI when needed. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true"
+            android:permission="android.permission.INTERNET">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 
 </manifest>
