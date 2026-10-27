@@ -261,10 +261,17 @@ The gate remains open until an interactive smoke pass verifies folder selection,
 - Fixed the `Class-Path` manifest write (back to `doFirst`; `doLast` runs after the jar is already written) and made `runnableJar`/`thinJar` depend on `compileKotlin` via the source set output instead of a fragile `inputs.dir` check.
 - Verified: zip unpacks and `java -jar nocturne/desktopApp-thin.jar` launches cleanly (launch confirmed via timeout kill, no errors in the log). Requires Java 21.
 
+## Desktop playback smoke (2026-10-27)
+
+Driven both visually (app launched in Hyprland, screenshot-verified) and through a JShell harness on `DesktopLocalPlayer`:
+
+- **Scan filtering**: a folder with MP3, OGG, WAV, FLAC, and a junk-header `.mp3` lists exactly 4 tracks — the `.flac` is skipped (no packaged decoder), `scanError` null.
+- **Playback**: MP3 (including the junk-header one), OGG, and WAV all play with the position polling (pos ≈2 s at the 2.5 s probe); live audio confirmed via an active `PipeWire ALSA [java]` sink-input while the app ran. Duration is reported for WAV (10 s); MP3 and OGG report `dur=0` (unknown via the SPI).
+- **Error path**: a text file named `.wav` (an accepted extension) fails cleanly — `isPlaying=false`, position 0, and `playbackError: "Cannot play 'fake-audio.wav': unsupported format, damaged file, or unavailable audio output"`.
+
 ## Next step
 
-1. Re-run the desktop smoke after GUI control is available: confirm the folder lists MP3/OGG and skips FLAC, play MP3/OGG, and check the error message with a missing or invalid listed file.
-2. Re-run the Android smoke pass when an emulator or device is responsive: folder selection, playback, persistence across restart, and background playback.
+1. Re-run the Android smoke pass when an emulator or device is responsive: folder selection, playback, persistence across restart, and background playback.
 4. Test playlist creation and the History pause/clear controls in an interactive flow.
 
 ## Desktop runtime recheck (2026-10-23)
