@@ -156,3 +156,10 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 **v0.1.0** - Phase 1 & 2 Complete  
 Phase 1: Core playback, playlists, history, persistence ✓  
 Phase 2: Android polish, desktop UX, settings resilience, packaging ✓
+
+
+## Screenshots
+
+<p align="center">
+  <img src="assets/logo.png" alt="Nocturne Logo" width="400">
+</p>
