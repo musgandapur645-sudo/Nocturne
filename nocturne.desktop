@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Nocturne
+GenericName=Music Player
+Comment=Offline local music player
+Exec=java -jar /opt/nocturne/desktopApp-thin.jar
+Icon=nocturne
+Terminal=false
+Categories=AudioVideo;Audio;Player;
+Keywords=music;audio;player;mp3;ogg;local;
+StartupWMClass=com-never-localmusic-desktop-MainKt
