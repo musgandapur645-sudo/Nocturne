@@ -9,7 +9,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,6 +22,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
@@ -42,7 +49,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.session.MediaController
@@ -50,12 +61,17 @@ import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
 import com.never.localmusic.android.AndroidLocalPlayer
 import com.never.localmusic.core.TrackView
+import com.never.localmusic.shared.AppSettings
 import com.never.localmusic.shared.LocalPlayerSnapshot
 import com.never.localmusic.shared.Playlist
+import com.never.localmusic.shared.ThemePresets
+import com.never.localmusic.shared.formatHex
+import com.never.localmusic.shared.parseHex
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.Executor
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 class MainActivity : ComponentActivity() {
@@ -81,6 +97,37 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /** Message shown after an appearance import or export. */
+    private var settingsMessage by mutableStateOf<String?>(null)
+
+    private val importSettingsPicker = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri == null) return@registerForActivityResult
+        val text = runCatching {
+            contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+        }.getOrNull()
+        settingsMessage = when {
+            text == null -> "Could not read the selected file."
+            else -> player.importSettingsJson(text)
+                ?.let { "Import failed: $it" }
+                ?: "Imported settings."
+        }
+    }
+
+    private val exportSettingsPicker = registerForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        if (uri == null) return@registerForActivityResult
+        val written = runCatching {
+            contentResolver.openOutputStream(uri)
+                ?.bufferedWriter()
+                ?.use { it.write(player.exportSettingsJson()) }
+                ?: error("The selected file could not be opened for writing.")
+        }.isSuccess
+        settingsMessage = if (written) "Exported settings." else "Could not write the selected file."
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -90,15 +137,16 @@ class MainActivity : ComponentActivity() {
             serviceConnectionOnDisconnected = {},
         )
 
-        val persisted = contentResolver.persistedUriPermissions.firstOrNull()
+        val persisted = contentResolver.persistedUriPermissions.firstOrNull { it.isReadPermission }
+            ?: contentResolver.persistedUriPermissions.firstOrNull()
         if (persisted != null) {
             startFolderScan(persisted.uri)
         }
 
         setContent {
-            MaterialTheme {
-                Surface {
-                    val snap by player.snapshotFlow.collectAsState()
+            val snap by player.snapshotFlow.collectAsState()
+            NocturneTheme(snap.settings) {
+                Surface(color = MaterialTheme.colorScheme.background) {
                     MainScreen(
                         snap = snap,
                         onChooseFolder = { openFolderPicker() },
@@ -120,6 +168,13 @@ class MainActivity : ComponentActivity() {
                         onPauseHistory = { player.pauseHistory() },
                         onResumeHistory = { player.resumeHistory() },
                         onClearHistory = { player.clearHistory() },
+                        onUpdateSettings = { player.updateSettings(it) },
+                        onImportSettings = {
+                            importSettingsPicker.launch(arrayOf("application/json", "text/plain", "*/*"))
+                        },
+                        onExportSettings = { exportSettingsPicker.launch("nocturne-settings.json") },
+                        settingsMessage = settingsMessage,
+                        onDismissSettingsMessage = { settingsMessage = null },
                     )
                 }
             }
@@ -279,9 +334,14 @@ fun MainScreen(
     onPauseHistory: () -> Unit,
     onResumeHistory: () -> Unit,
     onClearHistory: () -> Unit,
+    onUpdateSettings: (AppSettings) -> Unit,
+    onImportSettings: () -> Unit,
+    onExportSettings: () -> Unit,
+    settingsMessage: String?,
+    onDismissSettingsMessage: () -> Unit,
 ) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
-    val tabs = listOf("Library", "Playlists", "Favorites", "History")
+    val tabs = listOf("Library", "Playlists", "Favorites", "History", "Appearance")
 
     Scaffold(
         topBar = {
@@ -354,6 +414,23 @@ fun MainScreen(
                     onPauseHistory = onPauseHistory,
                     onResumeHistory = onResumeHistory,
                     onClearHistory = onClearHistory,
+                )
+                4 -> AppearanceTab(
+                    settings = snap.settings,
+                    onUpdate = onUpdateSettings,
+                    onImport = onImportSettings,
+                    onExport = onExportSettings,
+                )
+            }
+
+            settingsMessage?.let { message ->
+                AlertDialog(
+                    onDismissRequest = onDismissSettingsMessage,
+                    title = { Text("Appearance") },
+                    text = { Text(message) },
+                    confirmButton = {
+                        TextButton(onClick = onDismissSettingsMessage) { Text("OK") }
+                    },
                 )
             }
         }
@@ -710,3 +787,151 @@ private fun AddToPlaylistDialog(
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }
+
+// ---------------------------------------------------------------------------
+// Appearance (customization phase)
+// See docs/customization-spec.md
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun AppearanceSection(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(bottom = 6.dp),
+    )
+}
+
+@Composable
+private fun AppearanceTab(
+    settings: AppSettings,
+    onUpdate: (AppSettings) -> Unit,
+    onImport: () -> Unit,
+    onExport: () -> Unit,
+) {
+    val accent = MaterialTheme.colorScheme.primary
+    val activeSlug = ThemePresets.bySlug(settings.preset).slug
+    val intensity = settings.glassIntensity.coerceIn(0, 100)
+    val tier = when {
+        intensity <= 24 -> "Solid"
+        intensity <= 49 -> "Frosted"
+        intensity <= 74 -> "Crystal"
+        else -> "Vapor"
+    }
+
+    var hexDraft by remember(settings.accent, settings.preset) {
+        mutableStateOf(formatHex(parseHex(settings.accent) ?: ThemePresets.bySlug(settings.preset).accent))
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        AppearanceSection("PRESET")
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ThemePresets.all.forEach { preset ->
+                val selected = preset.slug == activeSlug
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(
+                            if (selected) MaterialTheme.colorScheme.primaryContainer
+                            else MaterialTheme.colorScheme.surfaceVariant
+                        )
+                        .border(
+                            width = 1.dp,
+                            color = if (selected) colorOf(preset.accent) else MaterialTheme.colorScheme.outline,
+                            shape = RoundedCornerShape(10.dp),
+                        )
+                        .clickable { onUpdate(settings.copy(preset = preset.slug, accent = null)) }
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(colorOf(preset.accent)),
+                    )
+                    Text(preset.displayName, style = MaterialTheme.typography.labelMedium)
+                }
+            }
+        }
+
+        AppearanceSection("ACCENT")
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            ThemePresets.all.forEach { preset ->
+                val current = formatHex(parseHex(settings.accent) ?: ThemePresets.bySlug(settings.preset).accent) ==
+                    formatHex(preset.accent)
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(colorOf(preset.accent))
+                        .border(
+                            width = if (current) 2.dp else 1.dp,
+                            color = if (current) Color.White else MaterialTheme.colorScheme.outline,
+                            shape = CircleShape,
+                        )
+                        .clickable { onUpdate(settings.copy(accent = formatHex(preset.accent))) },
+                )
+            }
+        }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            OutlinedTextField(
+                value = hexDraft,
+                onValueChange = { hexDraft = it },
+                singleLine = true,
+                label = { Text("#RRGGBB") },
+                modifier = Modifier.width(150.dp),
+            )
+            TextButton(onClick = {
+                val parsed = parseHex(hexDraft)
+                if (parsed != null) onUpdate(settings.copy(accent = formatHex(parsed)))
+            }) { Text("Apply", color = accent) }
+            if (settings.accent != null) {
+                TextButton(onClick = { onUpdate(settings.copy(accent = null)) }) {
+                    Text("Reset", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+
+        AppearanceSection("GLASS \u00b7 $tier \u00b7 $intensity")
+        Slider(
+            value = intensity.toFloat(),
+            onValueChange = { onUpdate(settings.copy(glassIntensity = it.roundToInt())) },
+            valueRange = 0f..100f,
+        )
+        Text(
+            "0 is solid; 100 is the most see-through.",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        AppearanceSection("SETTINGS FILE")
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = onExport) { Text("Export") }
+            Button(onClick = onImport) { Text("Import") }
+        }
+        Text(
+            "One JSON file holds preset, accent and glass level.",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/** 0xAARRGGBB from the shared settings model to a Compose colour. */
+private fun colorOf(argb: Long): Color = Color(argb)

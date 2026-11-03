@@ -29,6 +29,8 @@ interface LocalPlayer {
     fun toggleShuffle()
     fun toggleRepeat()
     fun clearQueue()
+    fun addToQueue(track: TrackView)
+    fun removeFromQueue(index: Int)
 
     // ---- library / folder ----
     fun openMusicFolder()
@@ -53,6 +55,14 @@ interface LocalPlayer {
     fun pauseHistory()
     fun resumeHistory()
     fun clearHistory()
+
+    // ---- appearance ----
+    /** Apply (and persist) a whole settings object. */
+    fun updateSettings(settings: AppSettings)
+    /** Current settings serialized as the documented JSON, for export. */
+    fun exportSettingsJson(): String
+    /** Replace settings from JSON text; null on success, else a reason. */
+    fun importSettingsJson(text: String): String?
 
     // ---- misc ----
     fun onOpenFolderRequested()
@@ -97,4 +107,6 @@ data class LocalPlayerSnapshot(
     val history: List<HistoryEntry> = emptyList(),
     /** True while history recording is paused. */
     val isHistoryPaused: Boolean = false,
+    /** Appearance: preset, accent override, glass intensity. */
+    val settings: AppSettings = AppSettings(),
 )

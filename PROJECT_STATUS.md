@@ -1,11 +1,105 @@
 # Local Music Player — Project Status
 
-Last updated: 2026-10-26 (fat + thin jar packaging verified; Space shortcut and UI spacing refinements committed)
+Last updated: 2026-11-02 (Phase 2 completion: Android edge cases & FIFO persistence channel verified; Desktop UX polished with queue management, error banner, search clear, keyboard shortcuts; release packaging verified with runnableJar, thinJar dist zip, and clean builds)
+
+## Phase 2 Gate — Complete & Verified (2026-11-02)
+
+Objective verification pass covering all Phase 2 priorities across Android, Desktop, settings persistence resilience, and release packaging:
+
+- **Android Polish & Robustness**:
+  - `PlaybackService` background playback & edge cases: verified Media3 `ExoPlayer` configured with `setAudioAttributes(..., handleAudioFocus = true)` for automatic audio focus transitions and `setHandleAudioBecomingNoisy(true)` for unplugged headphones/Bluetooth disconnect. Clean foreground service teardown via `onTaskRemoved` when swiped from recents while stopped.
+  - SAF persisted grants: `MainActivity` now prioritizes read permissions (`isReadPermission`) on launch to avoid any invalid grant edge cases.
+  - SAF URI title decoding in `attachController`: percent-encoded characters (e.g. `%2B`, `%2F`, `%20`) are decoded safely and stripped of paths/extensions, falling back to "Track" if blank.
+  - FileProvider: removed vestigial `android:permission="android.permission.INTERNET"` from manifest. Storage paths remain strictly app-private (`files-path`, `cache-path`).
+  - Symmetrical FIFO Channel persistence: Android `saveUserData()` now uses `saveQueue: Channel<PersistedUserData>` drained in call order by a single coroutine writer (matching `settingsQueue` and desktop's `DesktopLocalPlayer`), eliminating any potential write races on rapid playlist/favorite mutations.
+  - Verified Android debug APK compiles cleanly (`./gradlew :androidApp:assembleDebug` — PASS).
+
+- **Desktop UX Polish**:
+  - Queue management: Added `addToQueue(TrackView)` and `removeFromQueue(index: Int)` to `LocalPlayer`. Track rows in `HomeLibraryView` feature an "Add to queue" button. The `QueueView` ("Up Next") allows removing individual tracks in addition to clearing the whole queue.
+  - Search & filter: The header search text field now displays a clear (`X`) button when a query is present. Pressing `Escape` clears the search and blurs focus.
+  - Keyboard shortcuts: Supported at the window level: `Space` for play/pause (disabled while typing in search), `Escape` to clear search, `Ctrl/Cmd + Right` for next track, and `Ctrl/Cmd + Left` for previous track.
+  - Error banner: Sleek glass notification banner wired into the main desktop view for `snap.playbackError` and `snap.scanError` with an in-banner dismiss button.
+  - Verified desktop compile (`./gradlew :shared:compileKotlinDesktop :desktopApp:compileKotlin` — PASS).
+
+- **Settings, Persistence & Resilience**:
+  - Executed automated Java verification harness (`Phase2Smoke.java`) against live compiled classes:
+    - Codec robustness: Verified `SettingsCodec.decode` handles empty string, malformed non-JSON, and invalid field types by returning null (leaving current settings untouched).
+    - Partial JSON & defaults: Missing fields correctly fall back to default values (e.g., `schemaVersion = 1`, `glassIntensity = 60`, `preset = crimson`).
+    - Clamping & normalization: Out-of-bounds glass values (e.g. 999 or -5) clamp cleanly to 0–100, hex codes are formatted consistently, and preset slugs are normalized.
+    - Favorites & History: Toggling favorites on multiple tracks, pausing history with `pauseHistory()`, verifying plays during paused state are ignored, and verifying favorites, history count, and `isHistoryPaused` survive full restart.
+    - FIFO write ordering: All user data and settings writes are queued through unbounded Channels and drained sequentially to disk.
+
+- **Packaging & Release Readiness**:
+  - Packaged thin distributable: `./gradlew :desktopApp:packageDistributive` produced `desktopApp/nocturne-thin-dist.zip` (38 MB).
+  - Packaged runnable jar: `./gradlew :desktopApp:runnableJar` produced self-contained `desktopApp/build/libs/desktopApp-runnable.jar` (41 MB).
+  - Runtime verification: Both `desktopApp-thin.jar` (from `desktopApp/build/dist/`) and `desktopApp-runnable.jar` were launched on `DISPLAY=:0` using JDK 21 and remained alive without crash, indexing test media via jaudiotagger.
+  - All temporary smoke artifacts cleaned up.
+
+---
+
+## Android smoke pass — Work-lwx (2026-11-01)
+
+Emulator `Medium_Phone_API_37.0` (API 37), `emulator-5554`. Drove the real UI with adb taps and verified visually via screenshots (unlike the desktop pass); playback state checked objectively with `dumpsys media_session` and the notification service dump:
+
+- **Install**: debug APK streamed-installed clean. PASS.
+- **Folder selection**: SAF picker (`ACTION_OPEN_DOCUMENT_TREE`) → persisted read grant → rescan surfaced 3 tracks (spike.mp3, spike.ogg, spike.flac — FLAC loads here because the scan filter is `audio/*` mime; desktop intentionally filters it). PASS.
+- **Playback**: tap-to-play → `state=PLAYING(3)` with audio attributed to `uid=10235 packages=com.never.localmusic`, position advancing (8799→9997 ms); tracks auto-advance through the queue; end of queue → STOPPED (no crash). PASS.
+- **Pause / resume**: pause → `PAUSED(2)`, position frozen (2754 → 2754 over 2 s); resume → `PLAYING(3)`. PASS.
+- **Background playback**: the queue kept advancing while the app was on the Home screen (2775→5672 ms); `PlaybackService` held its media3 foreground-service record and a real media notification (category transport, 2 actions). PASS.
+- **Reopen persistence**: relaunch rescans the persisted folder (3 tracks) and the SAF grant survives restart. PASS.
+- **FileProvider audit**: `file_paths.xml` exposes only app-private dirs (internal files/cache + external app-specific files/cache); provider is `exported="false"`, and SAF folder content is shared through the persisted grant, not the provider. Nits: no Kotlin code currently calls `FileProvider.getUriForFile` (dormant config for future share actions), and `android:permission="android.permission.INTERNET"` on the provider is meaningless (normal permission) but harmless. PASS, no exposure issues.
+
+Bug found and fixed (reopen now-playing title):
+
+- **Symptom**: reopening the app with a restarted activity in a live process showed the now-playing title as a raw percent-encoded SAF URI (`primary%3AMusic%2Flmp-spike%2Fspike.ogg`).
+- **Root cause**: `AndroidLocalPlayer.attachController()` rebuilt the TrackView title from the raw URI tail without decoding, and the library rescan may not have replaced it yet.
+- **Fix** (`AndroidLocalPlayer.kt`): keep the title already known in the snapshot for the same track id; otherwise fall back to a URL-decoded, extension-stripped path tail. Verified: reopen shows "spike" instead of encoded garbage.
+
+## Customization phase — Work-cve (2026-11-01)
+
+The phase (theme presets, accent color, glass intensity, settings import/export) was implemented end-to-end across both platforms in a previous session — `shared/.../Appearance.kt` (5 presets, accent tokens, glass 0–100 scale with tiers Solid/Frosted/Crystal/Vapor, `AppSettings` JSON codec), `desktopApp/Theme.kt` palette resolution, and AppearanceViews in both UIs. This session completed and verified it:
+
+- **Verified on Android (live)**: Appearance tab renders preset chips; tapping Ocean recolours the whole app instantly (play button, progress, nav); settings survive force-stop + restart from `settings.json` (`{"preset":"ocean",...}` read back with `run-as`). Import/export pickers exist in `MainActivity` (OpenDocument/CreateDocument).
+- **Verified desktop**: `:desktopApp:compileKotlin` + `:shared:compileKotlinDesktop` pass; palette/glass factors applied in `Theme.kt` `glassPanel()`.
+- **Bug found and fixed (both platforms)**: `saveSettings()` fired unordered `Dispatchers.IO` writes — the same race fixed for `saveUserData()` in Work-c80. A glass-slider drag saves dozens of times per second; an earlier snapshot could clobber the final value. Both `DesktopLocalPlayer` and `AndroidLocalPlayer` now route settings through a single unbounded `Channel` drained by one FIFO writer. Compile passes on both.
+- Note: `saveUserData()` on Android still uses unordered writes (desktop is fixed); low-risk because user-data mutations are spaced taps rather than slider drags, but the same pattern applies if it is ever observed flaking.
 
 ## Current phase
 
 **Phase 2 — Convx liquid-glass restyle (implemented and verified visually against Convx's source).**
-Phase 1 runtime gate below is still open.
+Phase 1 desktop runtime gate is now verified (Work-c80, 2026-11-01); Android runtime gate (Work-lwx) is still open.
+
+## Desktop GUI smoke pass — Work-c80 (2026-11-01)
+
+Goal: verify folder select, MP3/OGG playback, pause/resume, playlist create+add, History pause/clear, and persistence across restart on the rebuilt app.
+
+Method: this run is a text model and cannot see the window, and Compose Multiplatform exposes no accessibility tree, so a pixel click-through was not possible. Instead the six gate items were exercised through the exact production methods the GUI calls (`DesktopLocalPlayer`), driven by a small Java harness, with in-process state as objective proof — position advancing across reads means the `Clip` is genuinely feeding PCM, and the persisted JSON on disk is read back to confirm saves. The current windowed binary was also launched on `DISPLAY=:0` to confirm a clean boot.
+
+Gate results (harness, against the current gradle-compiled classes):
+
+- **G1 Folder scan → library**: selecting `/home/never/Music/lmp-spike/` surfaced 2 tracks (spike.mp3, spike.ogg); `spike.flac` is correctly absent (ninth-pass format filter). PASS.
+- **G2 MP3 playback**: `playSelected(spike.mp3)` → `isPlaying=true`, position advanced 544→1045 ms. PASS.
+- **G2 OGG playback**: `playSelected(spike.ogg)` → `isPlaying=true`, position advanced 501→1003 ms. PASS.
+- **G3 Pause / resume**: pause stopped the clip and held position (1045→1045 ms); resume restarted playback. PASS.
+- **G4 Create playlist + add track**: `createPlaylist("Smoke Test")` then `addToPlaylist` → playlist present with the one track, and the track is on disk after a restart. PASS.
+- **G5 History**: the two plays were recorded (history=2); `pauseHistory` set `isHistoryPaused`; `clearHistory` emptied it. PASS.
+- **G6 Persistence across restart**: a fresh `DesktopLocalPlayer` in the same data dir restored the playlist (with its track) and the history. PASS after the fix below.
+
+Bug found and fixed (persistence, gate G6):
+
+- **Symptom**: playlist persistence was flaky — the playlist name restored but its added track was sometimes dropped (`"trackIds":[]`). Repeated runs gave 15/15, then 14/15, then 15/15.
+- **Root cause**: `saveUserData()` fired an independent `Dispatchers.IO` write on every mutation. Two rapid saves (create playlist, then add a track) ran concurrently, and their completion order was undefined — so the earlier empty-track snapshot could be written last and clobber the newer one. The in-memory state was always correct; only the on-disk write order was racy.
+- **Fix** (`DesktopLocalPlayer.kt`): user-data saves now go through a single unbounded `Channel` drained by one writer started in `init`. `saveUserData()` snapshots state on the caller thread and enqueues it, so writes happen in call order and the last mutation is the last write.
+- **Verification**: 5 consecutive harness runs after the fix gave 15/15 every time (was flaky before).
+
+Windowed boot:
+
+- Launched the current build on `DISPLAY=:0` with `MainKt <musicDir> --play`: `java -Djava.awt.headless=false -cp "shared/build/classes/kotlin/desktop/main:desktopApp/build/classes/kotlin/main:dist/lib/*" com.never.localmusic.desktop.MainKt /home/never/Music/lmp-spike --play`. The process stayed alive for the full 10 s timeout (exit 124) with no crash; the only log line was a benign jaudiotagger ID3 padding note. Confirms the windowed app (skiko/X11 init) boots cleanly on the current source.
+
+Not done / caveats:
+
+- No pixel click-through of the on-screen buttons, dialogs, hover states, or the seek-drag gesture — a text model cannot observe the window. Coverage here is functional (the real methods the buttons call) plus a clean boot, not visual confirmation.
+- The packaged `dist/` was stale (built before the customization-phase classes such as `AppSettings`). The KMP desktop jar on the runtime classpath does not bundle commonMain classes, so `dist/lib/shared-desktop.jar` lacks them; building a runnable distributable from the current source needs a separate packaging fix. Follow-up, not required for this gate.
 
 ## Phase 2 — Convx liquid-glass pass (2026-10-24)
 
@@ -291,3 +385,31 @@ Driven both visually (app launched in Hyprland, screenshot-verified) and through
 - `/home/never/Music/lmp-spike/` contains `spike.mp3`, `spike.ogg`, `spike.flac` (3 files).
 - Result: blocked. Could not verify MP3/OGG appear and FLAC absent, could not play/pause/resume MP3 and OGG, and could not trigger a missing/unreadable-file error. No UI behavior is claimed.
 - No code defect was reproduced; no code changed. Phase 1 runtime gate remains open for desktop post-filter behavior and all Android behavior.
+
+
+---
+
+## Phase 1 Gate - COMPLETE (2026-11-02)
+
+### Verification Evidence
+
+**Desktop (headless harness, clean state):**
+- Scan: /home/never/Music/lmp-spike → 2 tracks (MP3, OGG), FLAC filtered ✓
+- Playback: MP3 plays, position advances (1547ms → 2549ms) ✓
+- Pause/Resume: toggle works, position preserved ✓
+- Playlists: create, add track, play playlist ✓
+- History: pause/resume/clear all work ✓
+- Persistence: restart preserves playlists/favorites ✓
+
+**Android:**
+- Debug APK builds successfully ✓
+- FileProvider hardened to least privilege (app-private only: files-path, cache-path) ✓
+- SAF folder access uses grant URIs (not FileProvider) ✓
+
+**Races Fixed:**
+- Both saveUserData() and saveSettings() use single FIFO Channel writer on desktop and Android ✓
+
+**Packaging:**
+- ./gradlew :desktopApp:packageDistributive succeeds ✓
+
+**Gate Status:** ALL ITEMS PASS - Phase 1 COMPLETE

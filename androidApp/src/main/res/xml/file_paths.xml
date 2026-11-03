@@ -1,10 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- App-private storage used for library index, artwork cache, and JSON user data.
-         SAF-retained folder access itself is handled through the Storage Access Framework
-         grant URI, not through this FileProvider, so the app does not expose broad storage. -->
+    <!-- App-private storage only. SAF folder access uses grant URIs, not FileProvider. -->
     <files-path name="app_files" path="." />
     <cache-path name="app_cache" path="." />
-    <external-files-path name="external_files" path="." />
-    <external-cache-path name="external_cache" path="." />
 </paths>

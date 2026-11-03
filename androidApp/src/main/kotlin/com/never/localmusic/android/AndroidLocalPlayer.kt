@@ -7,15 +7,18 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import com.never.localmusic.core.TrackView
+import com.never.localmusic.shared.AppSettings
 import com.never.localmusic.shared.HistoryEntry
 import com.never.localmusic.shared.LocalPlayer
 import com.never.localmusic.shared.LocalPlayerSnapshot
 import com.never.localmusic.shared.PersistedUserData
 import com.never.localmusic.shared.Playlist
+import com.never.localmusic.shared.SettingsCodec
 import com.never.localmusic.shared.UserDataCodec
 import com.never.localmusic.shared.toHistoryEntry
 import com.never.localmusic.shared.toPersisted
 import com.never.localmusic.shared.toPlaylist
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -78,11 +81,29 @@ class AndroidLocalPlayer(
     // ── persistence file ──────────────────────────────────────────────────────
 
     private val userDataFile: File get() = File(context.filesDir, "user_data.json")
+    private val saveQueue: Channel<PersistedUserData> = Channel(Channel.UNLIMITED)
+
+    /** Appearance settings; see docs/customization-spec.md. */
+    private val settingsFile: File get() = File(context.filesDir, "settings.json")
+    private val settingsQueue: Channel<AppSettings> = Channel(Channel.UNLIMITED)
 
     // ── init: load persisted data ─────────────────────────────────────────────
 
     init {
         loadUserData()
+        loadSettings()
+        // Single FIFO writers for user data and settings: preserves call order
+        // so the last mutation is always the last write, avoiding race conditions.
+        scope.launch(Dispatchers.IO) {
+            for (data in saveQueue) {
+                runCatching { userDataFile.writeText(UserDataCodec.encode(data)) }
+            }
+        }
+        scope.launch(Dispatchers.IO) {
+            for (settings in settingsQueue) {
+                runCatching { settingsFile.writeText(SettingsCodec.encode(settings)) }
+            }
+        }
     }
 
     // ── MediaController ───────────────────────────────────────────────────────
@@ -195,6 +216,19 @@ class AndroidLocalPlayer(
             _playOrder.clear(); _playOrder.addAll(keep)
         }
         _snapshotFlow.update { it.copy(queue = emptyList()) }
+    }
+
+    override fun addToQueue(track: TrackView) {
+        _playOrder.add(track)
+        _snapshotFlow.update { it.copy(queue = queueFromCursor()) }
+    }
+
+    override fun removeFromQueue(index: Int) {
+        val target = _cursor + 1 + index
+        if (target in (_cursor + 1).._playOrder.lastIndex) {
+            _playOrder.removeAt(target)
+            _snapshotFlow.update { it.copy(queue = queueFromCursor()) }
+        }
     }
 
     override fun openMusicFolder() {}   // SAF picker owned by MainActivity
@@ -319,6 +353,38 @@ class AndroidLocalPlayer(
     override fun setNowPlaying(view: TrackView?) { _snapshotFlow.update { it.copy(nowPlaying = view) } }
 
     // ─────────────────────────────────────────────────────────────────────────
+    // Appearance settings
+    // ─────────────────────────────────────────────────────────────────────────
+
+    override fun updateSettings(settings: AppSettings) {
+        val next = settings.normalized()
+        _snapshotFlow.update { it.copy(settings = next) }
+        saveSettings(next)
+    }
+
+    override fun exportSettingsJson(): String = SettingsCodec.encode(snapshot.settings)
+
+    override fun importSettingsJson(text: String): String? {
+        val parsed = SettingsCodec.decode(text)
+            ?: return SettingsCodec.decodeError(text)
+        updateSettings(parsed)
+        return null
+    }
+
+    private fun loadSettings() {
+        runCatching {
+            val text = settingsFile.takeIf { it.exists() }?.readText() ?: return
+            val parsed = SettingsCodec.decode(text) ?: return
+            _snapshotFlow.update { it.copy(settings = parsed) }
+        }
+        // Absent or corrupt file → keep the defaults. No crash.
+    }
+
+    private fun saveSettings(settings: AppSettings) {
+        settingsQueue.trySend(settings) // single FIFO writer drains in call order
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // Controller lifecycle
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -329,10 +395,19 @@ class AndroidLocalPlayer(
         val mediaItem = controller.currentMediaItem ?: return
         val dur = controller.duration.takeIf { it != C.TIME_UNSET }?.coerceAtLeast(0L) ?: 0L
         val trackId = mediaItem.mediaId.ifBlank { mediaItem.localConfiguration?.uri?.toString() ?: "" }
+        // A SAF content URI's tail is percent-encoded ("primary%3AMusic%2F..."), and the
+        // library rescan may not have replaced it yet on reopen. Keep the title already
+        // known for this track; only build a fallback from the decoded URI when unknown.
+        val title = _snapshotFlow.value.nowPlaying
+            ?.takeIf { it.id == trackId }?.title
+            ?: trackId.substringAfterLast('/')
+                .let { runCatching { java.net.URLDecoder.decode(it.replace("+", "%2B"), java.nio.charset.StandardCharsets.UTF_8) }.getOrDefault(it) }
+                .substringAfterLast('/')                     // decoded %2F can hide a slash
+                .substringBeforeLast('.').ifBlank { "Track" }
         _snapshotFlow.update {
             it.copy(
                 nowPlaying = TrackView(id = trackId,
-                    title = trackId.substringAfterLast('/').ifBlank { "Track" }),
+                    title = title),
                 positionMs = controller.currentPosition.coerceAtLeast(0L),
                 durationMs = dur,
                 isPlaying  = controller.isPlaying,
@@ -433,17 +508,15 @@ class AndroidLocalPlayer(
     }
 
     private fun saveUserData() {
-        // Snapshot mutable state on the caller's thread before the IO dispatch.
+        // Snapshot mutable state on the caller's thread before enqueuing.
         val data = PersistedUserData(
             playlists = _playlists.map { it.toPersisted() },
             favorites = _favorites.toList(),
             history   = _history.map { it.toPersisted() },
             isHistoryPaused = _snapshotFlow.value.isHistoryPaused,
         )
-        scope.launch {
-            withContext(Dispatchers.IO) {
-                runCatching { userDataFile.writeText(UserDataCodec.encode(data)) }
-            }
-        }
+        // Enqueue to the single FIFO writer instead of firing an independent
+        // Dispatchers.IO write, eliminating race conditions.
+        saveQueue.trySend(data)
     }
 }

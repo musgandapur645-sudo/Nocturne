@@ -153,9 +153,29 @@ object PlayerIcons {
         }
     }.build()
 
+    /** Sliders glyph used for the Appearance section. */
+    val Sliders: ImageVector = ImageVector.Builder("Sliders", 24.dp, 24.dp, 24f, 24f).apply {
+        path(fill = SolidColor(Color.White)) {
+            moveTo(3f, 7f); horizontalLineToRelative(10f); verticalLineToRelative(2f); horizontalLineTo(3f); close()
+            moveTo(17f, 7f); horizontalLineToRelative(4f); verticalLineToRelative(2f); horizontalLineToRelative(-4f); close()
+            moveTo(15f, 5f); arcTo(3f, 3f, 0f, true, true, 15f, 11f); arcTo(3f, 3f, 0f, true, true, 15f, 5f); close()
+            moveTo(3f, 15f); horizontalLineToRelative(4f); verticalLineToRelative(2f); horizontalLineTo(3f); close()
+            moveTo(11f, 15f); horizontalLineToRelative(10f); verticalLineToRelative(2f); horizontalLineToRelative(-10f); close()
+            moveTo(9f, 13f); arcTo(3f, 3f, 0f, true, true, 9f, 19f); arcTo(3f, 3f, 0f, true, true, 9f, 13f); close()
+        }
+    }.build()
+
     val MusicNote: ImageVector = ImageVector.Builder("MusicNote", 24.dp, 24.dp, 24f, 24f).apply {
         path(fill = SolidColor(Color.White)) {
             moveTo(12f, 3f); verticalLineToRelative(10.55f); arcTo(4f, 4f, 0f, true, false, 14f, 17f); verticalLineTo(7f); horizontalLineToRelative(4f); verticalLineTo(3f); horizontalLineToRelative(-6f); close()
+        }
+    }.build()
+
+    val Close: ImageVector = ImageVector.Builder("Close", 24.dp, 24.dp, 24f, 24f).apply {
+        path(fill = SolidColor(Color.White)) {
+            moveTo(19f, 6.41f); lineTo(17.59f, 5f); lineTo(12f, 10.59f); lineTo(6.41f, 5f); lineTo(5f, 6.41f)
+            lineTo(10.59f, 12f); lineTo(5f, 17.59f); lineTo(6.41f, 19f); lineTo(12f, 13.41f); lineTo(17.59f, 19f)
+            lineTo(19f, 17.59f); lineTo(13.41f, 12f); close()
         }
     }.build()
 }

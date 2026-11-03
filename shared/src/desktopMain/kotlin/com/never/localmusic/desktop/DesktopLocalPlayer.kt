@@ -1,15 +1,18 @@
 package com.never.localmusic.desktop
 
 import com.never.localmusic.core.TrackView
+import com.never.localmusic.shared.AppSettings
 import com.never.localmusic.shared.HistoryEntry
 import com.never.localmusic.shared.LocalPlayer
 import com.never.localmusic.shared.LocalPlayerSnapshot
 import com.never.localmusic.shared.PersistedUserData
 import com.never.localmusic.shared.Playlist
+import com.never.localmusic.shared.SettingsCodec
 import com.never.localmusic.shared.UserDataCodec
 import com.never.localmusic.shared.toHistoryEntry
 import com.never.localmusic.shared.toPersisted
 import com.never.localmusic.shared.toPlaylist
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -74,6 +77,9 @@ class DesktopLocalPlayer : LocalPlayer {
 
         private val userDataFile: File get() = File(storageDir, "user_data.json")
 
+        /** Appearance settings; see docs/customization-spec.md. */
+        private val settingsFile: File get() = File(storageDir, "settings.json")
+
         /** Embedded cover art is copied here so the UI can load it as a plain file. */
         private val artCacheDir: File by lazy {
             File(storageDir, "art_cache").also { it.mkdirs() }
@@ -109,10 +115,31 @@ class DesktopLocalPlayer : LocalPlayer {
     private val _favorites: MutableSet<String>        = mutableSetOf()
     private val _history:   MutableList<HistoryEntry> = mutableListOf()
 
+    /** FIFO sink for user-data writes; drained in write order by the single
+     *  writer started in the init block, so the last mutation is the last write. */
+    private val saveQueue: Channel<PersistedUserData> = Channel(Channel.UNLIMITED)
+    private val settingsQueue: Channel<AppSettings> = Channel(Channel.UNLIMITED)
+
     // ── init — load persisted data AFTER all fields are initialised ──────────
 
     init {
         loadUserData()
+        loadSettings()
+        // Single FIFO writer for user data and settings: preserves the order
+        // saveUserData()/saveSettings() were called in so the last mutation is
+        // always the last write. (Rapid slider drags save settings dozens of
+        // times in quick succession — unordered concurrent writes clobbered
+        // the final value.)
+        scope.launch(Dispatchers.IO) {
+            for (data in saveQueue) {
+                runCatching { userDataFile.writeText(UserDataCodec.encode(data)) }
+            }
+        }
+        scope.launch(Dispatchers.IO) {
+            for (settings in settingsQueue) {
+                runCatching { settingsFile.writeText(SettingsCodec.encode(settings)) }
+            }
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -193,7 +220,52 @@ class DesktopLocalPlayer : LocalPlayer {
         emit { it.copy(queue = emptyList()) }
     }
 
+    override fun addToQueue(track: TrackView) {
+        _playOrder.add(track)
+        emit { it.copy(queue = queueFromCursor()) }
+    }
+
+    override fun removeFromQueue(index: Int) {
+        val target = _cursor + 1 + index
+        if (target in (_cursor + 1).._playOrder.lastIndex) {
+            _playOrder.removeAt(target)
+            emit { it.copy(queue = queueFromCursor()) }
+        }
+    }
+
     override fun setNowPlaying(view: TrackView?) { emit { it.copy(nowPlaying = view) } }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Appearance settings
+    // ─────────────────────────────────────────────────────────────────────────
+
+    override fun updateSettings(settings: AppSettings) {
+        val next = settings.normalized()
+        emit { it.copy(settings = next) }
+        saveSettings(next)
+    }
+
+    override fun exportSettingsJson(): String = SettingsCodec.encode(_flow.value.settings)
+
+    override fun importSettingsJson(text: String): String? {
+        val parsed = SettingsCodec.decode(text)
+            ?: return SettingsCodec.decodeError(text)
+        updateSettings(parsed)
+        return null
+    }
+
+    private fun loadSettings() {
+        runCatching {
+            val text = settingsFile.takeIf { it.exists() }?.readText() ?: return
+            val parsed = SettingsCodec.decode(text) ?: return
+            emit { it.copy(settings = parsed) }
+        }
+        // Absent or corrupt file → keep the defaults. No crash.
+    }
+
+    private fun saveSettings(settings: AppSettings) {
+        settingsQueue.trySend(settings) // single FIFO writer drains in call order
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
     // Folder / library
@@ -214,6 +286,7 @@ class DesktopLocalPlayer : LocalPlayer {
                 isShuffle = it.isShuffle, isRepeat = it.isRepeat,
                 playlists = it.playlists, favorites = it.favorites,
                 history = it.history, isHistoryPaused = it.isHistoryPaused,
+                settings = it.settings,
             )
         }
         if (folder != null && folder.isDirectory && folder.canRead()) {
@@ -593,15 +666,16 @@ class DesktopLocalPlayer : LocalPlayer {
 
     private fun saveUserData() {
         // Snapshot mutable state immediately (on the caller's thread) so the
-        // coroutine writes a consistent view even if more mutations arrive quickly.
+        // value handed to the writer is consistent even if more mutations arrive.
         val data = PersistedUserData(
             playlists = _playlists.map { it.toPersisted() },
             favorites = _favorites.toList(),
             history   = _history.map { it.toPersisted() },
             isHistoryPaused = _flow.value.isHistoryPaused,
         )
-        scope.launch(Dispatchers.IO) {
-            runCatching { userDataFile.writeText(UserDataCodec.encode(data)) }
-        }
+        // Enqueue to the single FIFO writer instead of firing an independent
+        // Dispatchers.IO write. Concurrent writes have undefined completion
+        // order, so a stale earlier snapshot could overwrite a newer one.
+        saveQueue.trySend(data)
     }
 }

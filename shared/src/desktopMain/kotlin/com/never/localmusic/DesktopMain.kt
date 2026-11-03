@@ -13,4 +13,10 @@ import java.io.File
 object DesktopMain {
     // Replaced during compose app startup; see DesktopLocalPlayer.openMusicFolder.
     var chooseFolder: (() -> File?)? = null
+
+    /** Pick a settings.json to import; null when cancelled. */
+    var chooseSettingsFileToOpen: (() -> File?)? = null
+
+    /** Pick where to write settings.json; [defaultName] seeds the dialog. */
+    var chooseSettingsFileToSave: ((String) -> File?)? = null
 }
