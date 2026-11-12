@@ -1,17 +1,17 @@
-package com.never.localmusic.desktop
+package com.never.nocturne.desktop
 
-import com.never.localmusic.core.TrackView
-import com.never.localmusic.shared.AppSettings
-import com.never.localmusic.shared.HistoryEntry
-import com.never.localmusic.shared.LocalPlayer
-import com.never.localmusic.shared.LocalPlayerSnapshot
-import com.never.localmusic.shared.PersistedUserData
-import com.never.localmusic.shared.Playlist
-import com.never.localmusic.shared.SettingsCodec
-import com.never.localmusic.shared.UserDataCodec
-import com.never.localmusic.shared.toHistoryEntry
-import com.never.localmusic.shared.toPersisted
-import com.never.localmusic.shared.toPlaylist
+import com.never.nocturne.core.TrackView
+import com.never.nocturne.shared.AppSettings
+import com.never.nocturne.shared.HistoryEntry
+import com.never.nocturne.shared.LocalPlayer
+import com.never.nocturne.shared.LocalPlayerSnapshot
+import com.never.nocturne.shared.PersistedUserData
+import com.never.nocturne.shared.Playlist
+import com.never.nocturne.shared.SettingsCodec
+import com.never.nocturne.shared.UserDataCodec
+import com.never.nocturne.shared.toHistoryEntry
+import com.never.nocturne.shared.toPersisted
+import com.never.nocturne.shared.toPlaylist
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -37,6 +37,11 @@ import javax.sound.sampled.AudioSystem
 import javax.sound.sampled.Clip
 import javax.sound.sampled.LineEvent
 
+internal fun cleanMetadataValue(value: String?): String? = value
+    ?.filterNot { Character.isISOControl(it) }
+    ?.trim()
+    ?.takeIf { it.isNotBlank() }
+
 /**
  * Phase 1 desktop player.
  *
@@ -51,7 +56,7 @@ import javax.sound.sampled.LineEvent
  * Metadata: jaudiotagger for tags; filename fallback on error.
  *
  * Persistence: playlists, favorites, history, history-paused stored in
- * ~/.local/share/local-music-player/user_data.json (XDG_DATA_HOME honoured).
+ * ~/.local/share/nocturne/user_data.json (XDG_DATA_HOME honoured).
  * Loaded at startup; saved after every mutation of persisted state.
  * Corrupt or absent file silently starts with empty state.
  */
@@ -72,7 +77,7 @@ class DesktopLocalPlayer : LocalPlayer {
             val xdg = System.getenv("XDG_DATA_HOME")
             val base = if (!xdg.isNullOrBlank()) File(xdg)
                        else File(System.getProperty("user.home"), ".local/share")
-            File(base, "local-music-player").also { it.mkdirs() }
+            File(base, "nocturne").also { it.mkdirs() }
         }
 
         private val userDataFile: File get() = File(storageDir, "user_data.json")
@@ -466,9 +471,9 @@ class DesktopLocalPlayer : LocalPlayer {
 
         TrackView(
             id = file.absolutePath,
-            title  = tag?.getFirst(FieldKey.TITLE)?.takeIf  { it.isNotBlank() } ?: file.nameWithoutExtension,
-            artist = tag?.getFirst(FieldKey.ARTIST)?.takeIf { it.isNotBlank() },
-            album  = tag?.getFirst(FieldKey.ALBUM)?.takeIf  { it.isNotBlank() },
+            title  = cleanMetadataValue(tag?.getFirst(FieldKey.TITLE)) ?: file.nameWithoutExtension,
+            artist = cleanMetadataValue(tag?.getFirst(FieldKey.ARTIST)),
+            album  = cleanMetadataValue(tag?.getFirst(FieldKey.ALBUM)),
             durationMs = hdr.trackLength.toLong() * 1_000L,
             artPath = artPath,
         )
