@@ -1,8 +1,40 @@
-# Local Music Player — Project Status
+# Nocturne — Project Status
 
-Last updated: 2026-11-02 (Phase 2 completion: Android edge cases & FIFO persistence channel verified; Desktop UX polished with queue management, error banner, search clear, keyboard shortcuts; release packaging verified with runnableJar, thinJar dist zip, and clean builds)
+Last updated: 2026-11-03 (Liquid Glass UI Overhaul + contrast pass: dark, low-saturation artwork mesh, accent used as an edge marker instead of a surface wash, Haze blur system, Cupertino glass controls, Coil artwork, desktop player-bar polish)
 
-## Phase 2 Gate — Complete & Verified (2026-11-02)
+## Liquid Glass UI Overhaul — ui-liquid-glass-v2 (2026-11-03)
+
+Comprehensive overhaul inspired by [Convx](https://github.com/cosmictaserdev-creator/Convx) and iOS Cupertino design standards across both Android and Desktop:
+
+- **Android Liquid Glass & Blur Engine**:
+  - **Haze Blur System**: Integrated `dev.chrisbanes.haze:haze:1.6.10` and `dev.chrisbanes.haze:haze-materials:1.6.10`. Managed a centralized `HazeState` at the root `MainScreen`. Wrapped scrollable library views with `.hazeSource(hazeState)` and floating header, mini-player dock, bottom navigation bar, and full-player modal dialog with `.liquidGlass(hazeState)` using `HazeMaterials.ultraThin()`.
+  - **Ambient Artwork Mesh Gradient**: Ported Convx's drifting 4-blob mesh gradient backdrop (`AndroidMeshBackground.kt`). Integrated `androidx.palette:palette-ktx:1.0.0` to extract vibrant and dominant colors from ID3 embedded album artwork, smoothly drifting and morphing across track transitions.
+  - **Cupertino Controls**:
+    - Created `CupertinoSeekSlider` (`CupertinoComponents.kt`) with rounded pill track, active gradient glow, and draggable thumb with tactile spring scale on touch.
+    - Created `CupertinoGlassButton` with elevated specular border highlight and spring-bounce animation on press.
+    - Created `CupertinoPillToggle` for capsule toggles (Shuffle, Repeat, Favorite, Folder).
+  - **Album Artwork Pipeline**:
+    - Embedded ID3 artwork is extracted during `readTrackMeta` via `MediaMetadataRetriever.embeddedPicture`, cached to app disk, and associated with `TrackView.artPath`.
+    - Integrated `io.coil-kt:coil-compose:2.7.0` to asynchronously render album art in `TrackRow`, `ConvxMiniPlayer`, and `ConvxFullPlayerDialog` with rounded corners and subtle specular borders.
+  - **ConvxHeader & Floating Dock**:
+    - Sleek header with app logo badge, library folder breadcrumbs, and capsule "Folder" button.
+    - Floating `ConvxMiniPlayer` docked above bottom navigation with artwork thumbnail, title/artist marquee, favorite toggle, Cupertino transport buttons, and micro progress bar.
+    - Floating `ConvxBottomNavBar` with 5 evenly balanced tabs (Library, Playlists, Favorites, History, Settings) and pill indicators.
+    - Full `ConvxFullPlayerDialog` sheet with 250dp album art card, ambient drop shadow, Cupertino seek slider, 68dp play button, and ±10s skip pills.
+  - **Device Verification**: The header/dock layout was deployed to a physical phone (`itel S25`, Android 15) and checked with clean logcat. The backdrop, contrast, and navigation-label fixes landed after that run, so the current APK is **not yet re-verified on device**.
+
+- **Desktop UI Refinement**:
+  - Floating player bar play button gained a specular border highlight and accent shadow.
+  - The frosted glass sidebar, mesh backdrop, and search field were already present from earlier commits (`90eba8a`, `f3a5c5c`); this pass did not rebuild them.
+
+- **Contrast & backdrop pass (2026-11-03, same branch)**:
+  - Mesh colours are no longer saturated: both platforms clamp artwork swatches to a dark, low-saturation tint (lightness ≤ 0.24). Bright covers (a plain orange album) previously turned the whole window green.
+  - Desktop mesh blob alpha 0.85 → 0.60, scrim 0.10/0.38 → 0.30/0.55, so the tint reads as a backdrop behind the glass instead of a colour theme.
+  - Accent no longer paints whole surfaces: the selected sidebar row, the playing track row, and the queue "Now Playing" card use a neutral white wash plus an accent edge marker/label. Playing titles are `TextPrimary`, not accent-coloured.
+  - Android track rows switched from `MaterialTheme.colorScheme.primary` (user accent, could be orange) to `GlassTheme.Accent`, matching the rest of the glass UI.
+  - Verified: `:androidApp:assembleDebug` and `:desktopApp:compileKotlin` pass; desktop appearance confirmed from a fresh screenshot (`screenshots/desktop_liquid_glass_new.png`).
+
+---
 
 Objective verification pass covering all Phase 2 priorities across Android, Desktop, settings persistence resilience, and release packaging:
 
@@ -43,7 +75,7 @@ Emulator `Medium_Phone_API_37.0` (API 37), `emulator-5554`. Drove the real UI wi
 
 - **Install**: debug APK streamed-installed clean. PASS.
 - **Folder selection**: SAF picker (`ACTION_OPEN_DOCUMENT_TREE`) → persisted read grant → rescan surfaced 3 tracks (spike.mp3, spike.ogg, spike.flac — FLAC loads here because the scan filter is `audio/*` mime; desktop intentionally filters it). PASS.
-- **Playback**: tap-to-play → `state=PLAYING(3)` with audio attributed to `uid=10235 packages=com.never.localmusic`, position advancing (8799→9997 ms); tracks auto-advance through the queue; end of queue → STOPPED (no crash). PASS.
+- **Playback**: tap-to-play → `state=PLAYING(3)` with audio attributed to `uid=10235 packages=com.never.nocturne`, position advancing (8799→9997 ms); tracks auto-advance through the queue; end of queue → STOPPED (no crash). PASS.
 - **Pause / resume**: pause → `PAUSED(2)`, position frozen (2754 → 2754 over 2 s); resume → `PLAYING(3)`. PASS.
 - **Background playback**: the queue kept advancing while the app was on the Home screen (2775→5672 ms); `PlaybackService` held its media3 foreground-service record and a real media notification (category transport, 2 actions). PASS.
 - **Reopen persistence**: relaunch rescans the persisted folder (3 tracks) and the SAF grant survives restart. PASS.
@@ -94,7 +126,7 @@ Bug found and fixed (persistence, gate G6):
 
 Windowed boot:
 
-- Launched the current build on `DISPLAY=:0` with `MainKt <musicDir> --play`: `java -Djava.awt.headless=false -cp "shared/build/classes/kotlin/desktop/main:desktopApp/build/classes/kotlin/main:dist/lib/*" com.never.localmusic.desktop.MainKt /home/never/Music/lmp-spike --play`. The process stayed alive for the full 10 s timeout (exit 124) with no crash; the only log line was a benign jaudiotagger ID3 padding note. Confirms the windowed app (skiko/X11 init) boots cleanly on the current source.
+- Launched the current build on `DISPLAY=:0` with `MainKt <musicDir> --play`: `java -Djava.awt.headless=false -cp "shared/build/classes/kotlin/desktop/main:desktopApp/build/classes/kotlin/main:dist/lib/*" com.never.nocturne.desktop.MainKt /home/never/Music/lmp-spike --play`. The process stayed alive for the full 10 s timeout (exit 124) with no crash; the only log line was a benign jaudiotagger ID3 padding note. Confirms the windowed app (skiko/X11 init) boots cleanly on the current source.
 
 Not done / caveats:
 
@@ -117,7 +149,7 @@ Not done / caveats:
 
 ## Phase 2 — sidebar shell and vector icons (2026-10-24)
 
-- Desktop shell is now a left sidebar (220 dp) plus a content column, replacing the seven nav pills that were cramped in an 860 dp window. Sidebar holds the SoundVault logo tile, `BROWSE` (Home, Artists, Albums, Queue) and `LIBRARY` (Playlists, Favorites, History) sections with live counts on Queue and Favorites, the chosen folder name, and an `Open Folder` button pinned to the bottom.
+- Desktop shell is now a left sidebar (220 dp) plus a content column, replacing the seven nav pills that were cramped in an 860 dp window. Sidebar holds the Nocturne logo tile, `BROWSE` (Home, Artists, Albums, Queue) and `LIBRARY` (Playlists, Favorites, History) sections with live counts on Queue and Favorites, the chosen folder name, and an `Open Folder` button pinned to the bottom.
 - Every emoji glyph in `Main.kt` was replaced with a `PlayerIcons` vector from `ui/Icons.kt`: sidebar and folder button, transport controls, favourite hearts, track-row add-to-playlist, and the artwork fallback note.
 - Track lists moved from bordered cards to a flat table style: rows are transparent until they are the playing track, with a 32 dp index column, artwork, title/artist, duration, and the favourite toggle. Favourites rows gained artwork.
 - The floating dock keeps the existing transport and seek slider, now with vector icons, a favourite toggle for the current track, a `BorderSubtle` hairline, and a slimmer seek track with a white thumb.
@@ -128,7 +160,7 @@ Not done / caveats:
 
 ## Phase 2 — Dark Glass theme and discovery shelves (2026-10-24)
 
-- Added `desktopApp/src/main/kotlin/com/never/localmusic/desktop/Theme.kt` with the Dark Glass tokens (`GlassColors`), the `glassPanel` modifier, and the `DarkGlassTheme` wrapper around Material 3's dark colour scheme.
+- Added `desktopApp/src/main/kotlin/com/never/nocturne/desktop/Theme.kt` with the Dark Glass tokens (`GlassColors`), the `glassPanel` modifier, and the `DarkGlassTheme` wrapper around Material 3's dark colour scheme.
 - Replaced the desktop shell in `Main.kt`: header with search and folder picker, navigation pills, Home / Playlists / Favorites / History views, a "Jump Back In" history shelf above the track list, and a floating now-playing dock with shuffle, previous, play/pause, next, repeat, and a seek slider.
 - Existing behaviour kept intact: audio playback, folder picking through `DesktopMain.chooseFolder` with `JFileChooser` on the EDT, and all `UserDataStore`-backed state (playlists, favorites, history, history pause) still go through `DesktopLocalPlayer`.
 - Adapted the supplied sketch to the real snapshot API: `nowPlaying` (not `currentTrack`), `favorites` (not `favoriteIds`), no `folder` field (the header now shows the folder chosen in this session), and `HorizontalDivider` instead of the deprecated `Divider`.
@@ -173,11 +205,11 @@ Not done / caveats:
 - The desktop UI now shows a playback error for decoder/open failures and for files that have disappeared or become unreadable since scanning. MP3/OGG PCM conversion and stream/clip cleanup remain in place.
 - Build after the error-path fix: `./gradlew :shared:compileKotlinDesktop :desktopApp:compileKotlin :desktopApp:createDistributable --console=plain` — **PASS**, 14 tasks, 5 executed, 9 up to date.
 - Interactive smoke on the rebuilt app was **not verified**. Orca reported `runtime_unavailable` for GUI capabilities and app listing, including after `orca-ide open --json`; therefore the current filtered library, error banner, and playback were not visually checked. The prior eighth-pass MP3/OGG playback observation predates the format filter.
-- Launch in the default sandbox failed with `AWTError: Can't connect to X11 window server using ':0'`. With escalated display access, `timeout --signal=TERM --kill-after=2s 6s desktopApp/build/compose/binaries/main/app/local-music-player/bin/local-music-player` remained alive for six seconds and then exited 124 from the timeout with no error output. This confirms startup only, not the GUI smoke.
+- Launch in the default sandbox failed with `AWTError: Can't connect to X11 window server using ':0'`. With escalated display access, `timeout --signal=TERM --kill-after=2s 6s desktopApp/build/compose/binaries/main/app/nocturne/bin/nocturne` remained alive for six seconds and then exited 124 from the timeout with no error output. This confirms startup only, not the GUI smoke.
 
 ## Desktop post-filter interactive smoke (2026-10-23)
 
-- Attempted to open the built distributable at `desktopApp/build/compose/binaries/main/app/local-music-player/bin/local-music-player`. The process stayed alive for at least 10 seconds with no terminal output, then I stopped the process; this confirms process startup only.
+- Attempted to open the built distributable at `desktopApp/build/compose/binaries/main/app/nocturne/bin/nocturne`. The process stayed alive for at least 10 seconds with no terminal output, then I stopped the process; this confirms process startup only.
 - Orca computer-use capabilities were available, but `list-apps` returned an empty app list both before and after launch. Orca reported accessibility and screenshot permissions as unsupported. The alternate connected desktop surface also returned `apps: []` and `browsers: []`; its `listWindows()` method was unavailable.
 - Blocked: I could not observe the app window, select `/home/never/Music/lmp-spike/`, confirm MP3/OGG appear and FLAC is absent, test MP3/OGG play and pause/resume, or trigger the missing/unreadable-file error. No UI behavior is claimed for this pass.
 - No code defect was reproduced, and no code was changed. The Phase 1 gate remains open; desktop post-filter runtime behavior and Android behavior remain unverified.
@@ -380,7 +412,7 @@ Driven both visually (app launched in Hyprland, screenshot-verified) and through
 
 ## Desktop post-filter interactive smoke (2026-10-23, dispatched pass)
 
-- Re-launched the built distributable `/home/never/Work/projects/local-music-player/desktopApp/build/compose/binaries/main/app/local-music-player/bin/local-music-player`; process stayed alive for 8 seconds with no output, then terminated by timeout (exit 124). Startup only.
+- Re-launched the built distributable `/home/never/Work/projects/nocturne/desktopApp/build/compose/binaries/main/app/nocturne/bin/nocturne`; process stayed alive for 8 seconds with no output, then terminated by timeout (exit 124). Startup only.
 - GUI inspection was not possible: Kilo's `orca-ide` command failed to start the runtime ("Unable to start the Orca CLI through Electron node mode"), and the session's Orca `computer list-apps --json` returned an empty app list. No app window, library list, chooser, playback state, or error banner was observed.
 - `/home/never/Music/lmp-spike/` contains `spike.mp3`, `spike.ogg`, `spike.flac` (3 files).
 - Result: blocked. Could not verify MP3/OGG appear and FLAC absent, could not play/pause/resume MP3 and OGG, and could not trigger a missing/unreadable-file error. No UI behavior is claimed.

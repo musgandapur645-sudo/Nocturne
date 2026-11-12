@@ -82,7 +82,7 @@ back to 60.
 ## 4. Settings file
 
 One file per install, `settings.json`, stored beside `user_data.json`
-(`~/.local/share/local-music-player/settings.json` on Linux, the app-private
+(`~/.local/share/nocturne/settings.json` on Linux, the app-private
 files directory on Android).
 
 ```json
@@ -144,7 +144,7 @@ an older build must still import the file rather than reject it.
 
 | Concern | Location |
 | --- | --- |
-| Presets, tokens, clamping, JSON codec | `shared/src/commonMain/kotlin/com/never/localmusic/shared/Appearance.kt` |
+| Presets, tokens, clamping, JSON codec | `shared/src/commonMain/kotlin/com/never/nocturne/shared/Appearance.kt` |
 | Snapshot exposure + persistence | `LocalPlayerSnapshot.settings`, `LocalPlayer.updateSettings/importSettingsJson/exportSettingsJson` |
 | Desktop palette + glass mapping | `desktopApp/.../Theme.kt` (`GlassPalette`, `LocalGlassPalette`) |
 | Desktop appearance screen | `desktopApp/.../Main.kt` (`AppearanceView`, nav item 8) |

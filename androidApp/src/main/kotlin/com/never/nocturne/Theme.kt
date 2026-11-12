@@ -1,11 +1,11 @@
-package com.never.localmusic
+package com.never.nocturne
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import com.never.localmusic.shared.AppSettings
-import com.never.localmusic.shared.accentTokens
+import com.never.nocturne.shared.AppSettings
+import com.never.nocturne.shared.accentTokens
 
 /**
  * Material 3 colours resolved from the shared appearance settings.

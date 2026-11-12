@@ -5,15 +5,15 @@ plugins {
 }
 
 android {
-    namespace = "com.never.localmusic"
+    namespace = "com.never.nocturne"
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "com.never.localmusic"
+        applicationId = "com.never.nocturne"
         minSdk = 24
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.1.0-phase0"
+        versionCode = 2
+        versionName = "0.2.0"
     }
 
     buildFeatures {
@@ -31,4 +31,9 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.session)
+
+    implementation("dev.chrisbanes.haze:haze:1.6.10")
+    implementation("dev.chrisbanes.haze:haze-materials:1.6.10")
+    implementation("androidx.palette:palette-ktx:1.0.0")
+    implementation("io.coil-kt:coil-compose:2.7.0")
 }

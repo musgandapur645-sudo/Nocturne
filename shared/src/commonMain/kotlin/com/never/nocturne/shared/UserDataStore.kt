@@ -1,4 +1,4 @@
-package com.never.localmusic.shared
+package com.never.nocturne.shared
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -76,7 +76,7 @@ fun Playlist.toPersisted(): PersistedPlaylist = PersistedPlaylist(
 
 fun PersistedPlaylist.toPlaylist(): Playlist {
     val tracks = trackIds.mapIndexed { i, id ->
-        com.never.localmusic.core.TrackView(
+        com.never.nocturne.core.TrackView(
             id = id,
             title = trackTitles.getOrElse(i) { id.substringAfterLast('/').ifBlank { id } },
             artist = trackArtists.getOrNull(i),

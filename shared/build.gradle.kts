@@ -8,7 +8,7 @@ plugins {
 
 kotlin {
     androidLibrary {
-        namespace = "com.never.localmusic.shared"
+        namespace = "com.never.nocturne.shared"
         compileSdk = 37
         minSdk = 24
     }
@@ -38,6 +38,12 @@ kotlin {
                 implementation(libs.jaudiotagger)
                 implementation(libs.mp3spi)
                 implementation(libs.vorbisspi)
+            }
+        }
+
+        val desktopTest by getting {
+            dependencies {
+                implementation(kotlin("test"))
             }
         }
     }

@@ -1,4 +1,4 @@
-package com.never.localmusic.desktop
+package com.never.nocturne.desktop
 
 import java.io.File
 

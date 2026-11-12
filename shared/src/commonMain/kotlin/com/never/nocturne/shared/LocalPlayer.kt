@@ -1,6 +1,6 @@
-package com.never.localmusic.shared
+package com.never.nocturne.shared
 
-import com.never.localmusic.core.TrackView
+import com.never.nocturne.core.TrackView
 
 /**
  * Phase 1 shared player interface.

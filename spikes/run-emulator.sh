@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Relaunch the slimmed local-music-player emulator cold.
+# Relaunch the slimmed nocturne emulator cold.
 # Boot settings live in ~/.android/avd/Medium_Phone.avd/config.ini
 set -euo pipefail
 SDK="${ANDROID_SDK_ROOT:-$HOME/Android/Sdk}"

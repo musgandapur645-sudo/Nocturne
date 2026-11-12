@@ -1,4 +1,4 @@
-package com.never.localmusic.core
+package com.never.nocturne.core
 
 import kotlinx.coroutines.flow.StateFlow
 

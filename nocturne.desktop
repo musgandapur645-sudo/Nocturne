@@ -9,4 +9,4 @@ Icon=nocturne
 Terminal=false
 Categories=AudioVideo;Audio;Player;
 Keywords=music;audio;player;mp3;ogg;local;
-StartupWMClass=com-never-localmusic-desktop-MainKt
+StartupWMClass=com-never-nocturne-desktop-MainKt

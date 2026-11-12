@@ -1,4 +1,4 @@
-package com.never.localmusic.android
+package com.never.nocturne.android
 
 import android.content.Context
 import android.net.Uri
@@ -6,18 +6,18 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
-import com.never.localmusic.core.TrackView
-import com.never.localmusic.shared.AppSettings
-import com.never.localmusic.shared.HistoryEntry
-import com.never.localmusic.shared.LocalPlayer
-import com.never.localmusic.shared.LocalPlayerSnapshot
-import com.never.localmusic.shared.PersistedUserData
-import com.never.localmusic.shared.Playlist
-import com.never.localmusic.shared.SettingsCodec
-import com.never.localmusic.shared.UserDataCodec
-import com.never.localmusic.shared.toHistoryEntry
-import com.never.localmusic.shared.toPersisted
-import com.never.localmusic.shared.toPlaylist
+import com.never.nocturne.core.TrackView
+import com.never.nocturne.shared.AppSettings
+import com.never.nocturne.shared.HistoryEntry
+import com.never.nocturne.shared.LocalPlayer
+import com.never.nocturne.shared.LocalPlayerSnapshot
+import com.never.nocturne.shared.PersistedUserData
+import com.never.nocturne.shared.Playlist
+import com.never.nocturne.shared.SettingsCodec
+import com.never.nocturne.shared.UserDataCodec
+import com.never.nocturne.shared.toHistoryEntry
+import com.never.nocturne.shared.toPersisted
+import com.never.nocturne.shared.toPlaylist
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -401,7 +401,7 @@ class AndroidLocalPlayer(
         val title = _snapshotFlow.value.nowPlaying
             ?.takeIf { it.id == trackId }?.title
             ?: trackId.substringAfterLast('/')
-                .let { runCatching { java.net.URLDecoder.decode(it.replace("+", "%2B"), java.nio.charset.StandardCharsets.UTF_8) }.getOrDefault(it) }
+                .let { runCatching { java.net.URLDecoder.decode(it.replace("+", "%2B"), java.nio.charset.StandardCharsets.UTF_8.name()) }.getOrDefault(it) }
                 .substringAfterLast('/')                     // decoded %2F can hide a slash
                 .substringBeforeLast('.').ifBlank { "Track" }
         _snapshotFlow.update {

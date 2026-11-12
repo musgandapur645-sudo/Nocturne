@@ -1,4 +1,4 @@
-package com.never.localmusic.desktop
+package com.never.nocturne.desktop
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -18,12 +18,12 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.never.localmusic.shared.AccentTokens
-import com.never.localmusic.shared.AppSettings
-import com.never.localmusic.shared.GlassTokens
-import com.never.localmusic.shared.ThemePresets
-import com.never.localmusic.shared.accentTokens
-import com.never.localmusic.shared.glassTokens
+import com.never.nocturne.shared.AccentTokens
+import com.never.nocturne.shared.AppSettings
+import com.never.nocturne.shared.GlassTokens
+import com.never.nocturne.shared.ThemePresets
+import com.never.nocturne.shared.accentTokens
+import com.never.nocturne.shared.glassTokens
 
 /**
  * Everything the desktop UI paints with, resolved from [AppSettings].

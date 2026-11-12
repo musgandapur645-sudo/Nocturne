@@ -1,4 +1,4 @@
-package com.never.localmusic.desktop
+package com.never.nocturne.desktop
 
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -83,6 +83,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.loadImageBitmap
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -90,16 +91,16 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
-import com.never.localmusic.core.TrackView
-import com.never.localmusic.desktop.ui.ConvxMeshBackground
-import com.never.localmusic.desktop.ui.PlayerIcons
-import com.never.localmusic.desktop.ui.rememberArtworkPalette
-import com.never.localmusic.shared.AppSettings
-import com.never.localmusic.shared.LocalPlayerSnapshot
-import com.never.localmusic.shared.Playlist
-import com.never.localmusic.shared.ThemePresets
-import com.never.localmusic.shared.formatHex
-import com.never.localmusic.shared.parseHex
+import com.never.nocturne.core.TrackView
+import com.never.nocturne.desktop.ui.ConvxMeshBackground
+import com.never.nocturne.desktop.ui.PlayerIcons
+import com.never.nocturne.desktop.ui.rememberArtworkPalette
+import com.never.nocturne.shared.AppSettings
+import com.never.nocturne.shared.LocalPlayerSnapshot
+import com.never.nocturne.shared.Playlist
+import com.never.nocturne.shared.ThemePresets
+import com.never.nocturne.shared.formatHex
+import com.never.nocturne.shared.parseHex
 import java.io.File
 import javax.swing.JFileChooser
 import javax.swing.SwingUtilities
@@ -172,7 +173,7 @@ fun main(args: Array<String>) = application {
         // a preset, accent, or glass level changes.
         val settings by player.snapshotFlow.collectAsState()
         DarkGlassTheme(settings.settings) {
-            LocalMusicApp(player, searchFocus)
+            NocturneApp(player, searchFocus)
         }
     }
 }
@@ -205,7 +206,7 @@ private fun LibraryFolderName(library: List<TrackView>): String {
 }
 
 @Composable
-fun LocalMusicApp(player: DesktopLocalPlayer, searchFocus: SearchFocusFlag) {
+fun NocturneApp(player: DesktopLocalPlayer, searchFocus: SearchFocusFlag) {
     val snap by player.snapshotFlow.collectAsState()
     val scope = rememberCoroutineScope()
     var selectedNav by rememberSaveable { mutableStateOf(0) }
@@ -264,20 +265,29 @@ fun LocalMusicApp(player: DesktopLocalPlayer, searchFocus: SearchFocusFlag) {
                         Box(
                             modifier = Modifier
                                 .size(34.dp)
-                                .clip(RoundedCornerShape(9.dp))
+                                .clip(RoundedCornerShape(10.dp))
                                 .background(
                                     Brush.linearGradient(
-                                        listOf(GlassColors.Accent, Color(0xFF9333EA)),
+                                        listOf(GlassColors.Accent, GlassColors.AccentHover),
                                     ),
-                                ),
+                                )
+                                .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(10.dp)),
                             contentAlignment = Alignment.Center,
                         ) {
-                            Icon(
-                                PlayerIcons.MusicNote,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(18.dp),
-                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(18.dp)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(Color.White.copy(alpha = 0.12f)),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    PlayerIcons.MusicNote,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(14.dp),
+                                )
+                            }
                         }
                         Column {
                             Text(
@@ -305,7 +315,7 @@ fun LocalMusicApp(player: DesktopLocalPlayer, searchFocus: SearchFocusFlag) {
                     // Nav section label
                     Text(
                         "BROWSE",
-                        fontSize = 10.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = GlassColors.TextMuted,
                         letterSpacing = 1.5.sp,
@@ -330,7 +340,7 @@ fun LocalMusicApp(player: DesktopLocalPlayer, searchFocus: SearchFocusFlag) {
 
                     Text(
                         "LIBRARY",
-                        fontSize = 10.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = GlassColors.TextMuted,
                         letterSpacing = 1.5.sp,
@@ -551,6 +561,7 @@ fun LocalMusicApp(player: DesktopLocalPlayer, searchFocus: SearchFocusFlag) {
                             snap = snap,
                             onPlay = { player.playSelected(it) },
                             onToggleFav = { player.toggleFavorite(it) },
+                            onBrowseLibrary = { selectedNav = 0 },
                         )
                         6 -> HistoryView(
                             snap = snap,
@@ -683,7 +694,9 @@ fun SidebarNavItem(
             .clip(RoundedCornerShape(10.dp))
             .background(
                 when {
-                    isSelected -> accent.copy(alpha = 0.15f)
+                    // Selection is carried by the accent bar + label, not a full
+                    // accent wash, which clashed with the mesh behind the glass.
+                    isSelected -> Color.White.copy(alpha = 0.09f)
                     isHovered -> Color.White.copy(alpha = 0.05f)
                     else -> Color.Transparent
                 },
@@ -768,59 +781,139 @@ fun HomeLibraryView(
         contentPadding = PaddingValues(bottom = 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        // Shelf 1: "Jump Back In" (Recent from History)
+        // Shelf 1: recent listening with a more editorial, feature-led opening.
         if (snap.history.isNotEmpty()) {
             item {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    modifier = Modifier.padding(top = 4.dp, bottom = 14.dp),
-                ) {
-                    Text(
-                        "Jump Back In",
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = GlassColors.TextPrimary,
-                    )
-                    Row(
-                        modifier = Modifier.horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                val recent = snap.history.distinctBy { it.trackId }.take(6)
+                val featuredTrack = recent.firstOrNull()?.let { entry ->
+                    snap.library.firstOrNull { it.id == entry.trackId }
+                }
+                if (featuredTrack != null) {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.padding(top = 4.dp, bottom = 14.dp),
                     ) {
-                        snap.history.take(6).forEach { entry ->
-                            val track = snap.library.firstOrNull { it.id == entry.trackId }
-                            Box(
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                "Jump Back In",
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = GlassColors.TextPrimary,
+                            )
+                            TextButton(onClick = { onPlay(featuredTrack) }) {
+                                Text("Play now", color = GlassColors.Accent)
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .glassPanel(
+                                    cornerRadius = 18.dp,
+                                    backgroundColor = Color(0xFF0F1728),
+                                    borderColor = GlassColors.BorderSubtle,
+                                    elevation = 10.dp,
+                                )
+                                .clickable { onPlay(featuredTrack) }
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        ) {
+                            TrackArtwork(
+                                artPath = featuredTrack.artPath,
                                 modifier = Modifier
-                                    .width(150.dp)
-                                    .glassPanel(
-                                        cornerRadius = 12.dp,
-                                        backgroundColor = GlassColors.GlassCard,
-                                        borderColor = GlassColors.BorderSubtle,
-                                    )
-                                    .clickable { track?.let { onPlay(it) } }
-                                    .padding(12.dp),
+                                    .size(110.dp)
+                                    .clip(RoundedCornerShape(18.dp)),
+                                fallbackIconSize = 30.sp,
+                            )
+
+                            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(
+                                    "Resume listening",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = GlassColors.TextSecondary,
+                                    letterSpacing = 0.8.sp,
+                                )
+                                Text(
+                                    featuredTrack.title,
+                                    fontSize = 20.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = GlassColors.TextPrimary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Text(
+                                    featuredTrack.artist ?: "Unknown Artist",
+                                    fontSize = 12.sp,
+                                    color = GlassColors.TextSecondary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Text(
+                                    formatDuration(featuredTrack.durationMs),
+                                    fontSize = 11.sp,
+                                    color = GlassColors.TextMuted,
+                                )
+                            }
+
+                            Button(
+                                onClick = { onPlay(featuredTrack) },
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = GlassColors.Accent,
+                                    contentColor = Color.White,
+                                ),
                             ) {
-                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    TrackArtwork(
-                                        artPath = track?.artPath,
-                                        modifier = Modifier
-                                            .size(126.dp)
-                                            .clip(RoundedCornerShape(10.dp)),
-                                        fallbackIconSize = 36.sp,
-                                    )
-                                    Text(
-                                        entry.title,
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = GlassColors.TextPrimary,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                    Text(
-                                        entry.artist ?: "Unknown Artist",
-                                        fontSize = 11.sp,
-                                        color = GlassColors.TextSecondary,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
+                                Text("Play")
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier.horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            recent.drop(1).forEach { entry ->
+                                val track = snap.library.firstOrNull { it.id == entry.trackId }
+                                Box(
+                                    modifier = Modifier
+                                        .width(150.dp)
+                                        .glassPanel(
+                                            cornerRadius = 12.dp,
+                                            backgroundColor = GlassColors.GlassCard,
+                                            borderColor = GlassColors.BorderSubtle,
+                                        )
+                                        .clickable { track?.let { onPlay(it) } }
+                                        .padding(12.dp),
+                                ) {
+                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        TrackArtwork(
+                                            artPath = track?.artPath,
+                                            modifier = Modifier
+                                                .size(126.dp)
+                                                .clip(RoundedCornerShape(10.dp)),
+                                            fallbackIconSize = 36.sp,
+                                        )
+                                        Text(
+                                            entry.title,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = GlassColors.TextPrimary,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                        Text(
+                                            entry.artist ?: "Unknown Artist",
+                                            fontSize = 11.sp,
+                                            color = GlassColors.TextSecondary,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -829,10 +922,52 @@ fun HomeLibraryView(
             }
         }
 
-        // Shelf 2: All Songs Header
+        // Shelf 2: quick library stats to add weight and editorial rhythm.
         item {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 2.dp, bottom = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                val stats = listOf(
+                    "${tracks.size} tracks" to "Library",
+                    "${snap.favorites.size} saved" to "Favorites",
+                    "${snap.history.size} plays" to "History",
+                )
+                stats.forEach { (value, label) ->
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .glassPanel(
+                                cornerRadius = 12.dp,
+                                backgroundColor = GlassColors.GlassCard,
+                                borderColor = GlassColors.BorderSubtle,
+                            )
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(
+                                value,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = GlassColors.TextPrimary,
+                            )
+                            Text(
+                                label,
+                                fontSize = 11.sp,
+                                color = GlassColors.TextSecondary,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Shelf 3: All Songs Header
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -875,11 +1010,22 @@ fun HomeLibraryView(
                         .clip(RoundedCornerShape(8.dp))
                         .background(
                             when {
-                                isPlayingThis -> accent.copy(alpha = 0.12f)
+                                isPlayingThis -> Color.White.copy(alpha = 0.05f)
                                 trackIsHovered -> Color.White.copy(alpha = 0.04f)
                                 else -> Color.Transparent
                             },
                         )
+                        // Playing state is an accent edge marker, not a full red row.
+                        .drawBehind {
+                            if (isPlayingThis) {
+                                drawRoundRect(
+                                    color = accent,
+                                    topLeft = Offset(0f, size.height / 2f - 8.dp.toPx() / 2f),
+                                    size = Size(3.dp.toPx(), 16.dp.toPx()),
+                                    cornerRadius = CornerRadius(2.dp.toPx()),
+                                )
+                            }
+                        }
                         .hoverChanged { trackIsHovered = true }
                         .hoverChanged(false) { trackIsHovered = false }
                         .clickable { onPlay(track) }
@@ -907,7 +1053,7 @@ fun HomeLibraryView(
                             track.title,
                             fontSize = 14.sp,
                             fontWeight = if (isPlayingThis) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isPlayingThis) GlassColors.Accent else GlassColors.TextPrimary,
+                            color = GlassColors.TextPrimary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -1259,8 +1405,8 @@ fun QueueView(
                         .fillMaxWidth()
                         .glassPanel(
                             cornerRadius = 12.dp,
-                            backgroundColor = GlassColors.Accent.copy(alpha = 0.18f),
-                            borderColor = GlassColors.Accent.copy(alpha = 0.35f),
+                            backgroundColor = Color.White.copy(alpha = 0.05f),
+                            borderColor = GlassColors.Accent.copy(alpha = 0.30f),
                         )
                         .padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -1275,7 +1421,7 @@ fun QueueView(
                             current.title,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
-                            color = GlassColors.Accent,
+                            color = GlassColors.TextPrimary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -1388,15 +1534,15 @@ fun FloatingNowPlayingBar(
 
     Box(
         modifier = Modifier
-            .widthIn(max = 1000.dp)
+            .widthIn(max = 1050.dp)
             .fillMaxWidth()
-            .height(64.dp)
-            .clip(RoundedCornerShape(32.dp))
+            .height(70.dp)
+            .clip(RoundedCornerShape(28.dp))
             .glassPanel(
-                cornerRadius = 32.dp,
-                backgroundColor = Color(0x8C0E1220),
-                borderColor = Color(0x40FFFFFF),
-                elevation = 14.dp,
+                cornerRadius = 28.dp,
+                backgroundColor = Color(0xA50E1220),
+                borderColor = Color(0x50FFFFFF),
+                elevation = 16.dp,
             ),
     ) {
         // Playback progress strip: only rendered when a track is loaded.
@@ -1473,8 +1619,9 @@ fun FloatingNowPlayingBar(
                 TrackArtwork(
                     artPath = track?.artPath,
                     modifier = Modifier
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(10.dp)),
+                        .size(42.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(12.dp)),
                     fallbackIconSize = 18.sp,
                 )
                 Column(
@@ -1572,8 +1719,16 @@ fun FloatingNowPlayingBar(
                         modifier = Modifier
                             .fillMaxSize()
                             .graphicsLayer { scaleX = playScale; scaleY = playScale }
+                            .shadow(8.dp, CircleShape, spotColor = GlassColors.Accent)
                             .clip(CircleShape)
-                            .background(GlassColors.Accent),
+                            .background(GlassColors.Accent)
+                            .border(
+                                1.5.dp,
+                                Brush.verticalGradient(
+                                    listOf(Color(0x80FFFFFF), Color(0x20FFFFFF))
+                                ),
+                                CircleShape
+                            ),
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
@@ -1769,6 +1924,7 @@ fun FavoritesView(
     snap: LocalPlayerSnapshot,
     onPlay: (TrackView) -> Unit,
     onToggleFav: (String) -> Unit,
+    onBrowseLibrary: () -> Unit,
 ) {
     val favTracks = snap.library.filter { snap.favorites.contains(it.id) }
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -1780,13 +1936,20 @@ fun FavoritesView(
         )
         if (favTracks.isEmpty()) {
             Box(
-                modifier = Modifier.fillMaxWidth().padding(40.dp),
+                modifier = Modifier.fillMaxWidth().weight(1f).padding(40.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(
-                    "No favorites yet. Tap the heart on any track to add it here.",
-                    color = GlassColors.TextMuted,
-                )
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    Text(
+                        "No favorites yet. Tap the heart on any track to add it here.",
+                        color = GlassColors.TextMuted,
+                        textAlign = TextAlign.Center,
+                    )
+                    Button(onClick = onBrowseLibrary) { Text("Browse library") }
+                }
             }
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {

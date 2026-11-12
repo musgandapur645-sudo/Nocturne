@@ -1,4 +1,4 @@
-package com.never.localmusic
+package com.never.nocturne
 
 import android.app.Activity
 import android.content.Intent
@@ -8,6 +8,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -18,19 +19,36 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
@@ -50,23 +68,41 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.lifecycleScope
+import coil.compose.AsyncImage
+import com.never.nocturne.ui.AndroidMeshBackground
+import com.never.nocturne.ui.CupertinoGlassButton
+import com.never.nocturne.ui.CupertinoPillToggle
+import com.never.nocturne.ui.CupertinoSeekSlider
+import com.never.nocturne.ui.GlassTheme
+import com.never.nocturne.ui.liquidGlass
+import com.never.nocturne.ui.rememberArtworkColors
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
+import java.io.File
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
-import com.never.localmusic.android.AndroidLocalPlayer
-import com.never.localmusic.core.TrackView
-import com.never.localmusic.shared.AppSettings
-import com.never.localmusic.shared.LocalPlayerSnapshot
-import com.never.localmusic.shared.Playlist
-import com.never.localmusic.shared.ThemePresets
-import com.never.localmusic.shared.formatHex
-import com.never.localmusic.shared.parseHex
+import com.never.nocturne.android.AndroidLocalPlayer
+import com.never.nocturne.core.TrackView
+import com.never.nocturne.shared.AppSettings
+import com.never.nocturne.shared.LocalPlayerSnapshot
+import com.never.nocturne.shared.Playlist
+import com.never.nocturne.shared.ThemePresets
+import com.never.nocturne.shared.formatHex
+import com.never.nocturne.shared.parseHex
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -146,7 +182,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val snap by player.snapshotFlow.collectAsState()
             NocturneTheme(snap.settings) {
-                Surface(color = MaterialTheme.colorScheme.background) {
+                Surface(color = Color.Transparent) {
                     MainScreen(
                         snap = snap,
                         onChooseFolder = { openFolderPicker() },
@@ -273,7 +309,7 @@ class MainActivity : ComponentActivity() {
         return null
     }
 
-    /** Read title/artist/album/duration from a SAF URI using [MediaMetadataRetriever]. */
+    /** Read title/artist/album/duration and artwork from a SAF URI using [MediaMetadataRetriever]. */
     private fun readTrackMeta(uri: Uri, fileName: String): TrackView {
         return runCatching {
             val mmr = MediaMetadataRetriever()
@@ -288,8 +324,27 @@ class MainActivity : ComponentActivity() {
                     ?.takeIf { it.isNotBlank() }
                 val durMs = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
                     ?.toLongOrNull() ?: 0L
-                TrackView(id = uri.toString(), title = title, artist = artist, album = album,
-                    durationMs = durMs)
+                val picture = mmr.embeddedPicture
+                val artPath = if (picture != null) {
+                    runCatching {
+                        val artDir = File(cacheDir, "artwork").apply { mkdirs() }
+                        val hash = uri.toString().hashCode()
+                        val artFile = File(artDir, "art_$hash.jpg")
+                        if (!artFile.exists() || artFile.length() == 0L) {
+                            artFile.writeBytes(picture)
+                        }
+                        artFile.absolutePath
+                    }.getOrNull()
+                } else null
+
+                TrackView(
+                    id = uri.toString(),
+                    title = title,
+                    artist = artist,
+                    album = album,
+                    durationMs = durMs,
+                    artPath = artPath,
+                )
             } finally {
                 mmr.release()
             }
@@ -341,26 +396,128 @@ fun MainScreen(
     onDismissSettingsMessage: () -> Unit,
 ) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
-    val tabs = listOf("Library", "Playlists", "Favorites", "History", "Appearance")
+    var showFullPlayer by rememberSaveable { mutableStateOf(false) }
+    val hazeState = remember { HazeState() }
+    val ambientColors = rememberArtworkColors(snap.nowPlaying?.artPath)
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Local Music") },
-                actions = {
-                    TextButton(onClick = onChooseFolder) { Text("Folder") }
-                },
-            )
-        }
-    ) { inner ->
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(GlassTheme.Background)
+    ) {
+        // 1. Convx ambient mesh backdrop derived from album art
+        AndroidMeshBackground(colors = ambientColors)
+
+        // 2. Foreground content layout
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(inner),
+                .statusBarsPadding()
+                .navigationBarsPadding(),
         ) {
-            // Now-playing strip
-            NowPlayingStrip(
+            // Convx Liquid Glass Header
+            val folderName = snap.library.firstOrNull()?.let {
+                Uri.parse(it.id).lastPathSegment?.substringBeforeLast('/')
+            } ?: "Music"
+
+            ConvxHeader(
+                hazeState = hazeState,
+                folderName = folderName,
+                trackCount = snap.library.size,
+                onChooseFolder = onChooseFolder,
+            )
+
+            snap.scanError?.let { err ->
+                Text(
+                    text = "⚠️ $err",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                )
+            }
+
+            // Main Tab View with hazeSource for underlying blur
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .hazeSource(hazeState)
+            ) {
+                when (tab) {
+                    0 -> LibraryTab(
+                        snap = snap,
+                        onChooseFolder = onChooseFolder,
+                        onPlay = onPlay,
+                        onSearch = onSearch,
+                        onToggleFavorite = onToggleFavorite,
+                        onAddToPlaylist = onAddToPlaylist,
+                    )
+                    1 -> PlaylistsTab(
+                        snap = snap,
+                        onCreatePlaylist = onCreatePlaylist,
+                        onDeletePlaylist = onDeletePlaylist,
+                        onPlayPlaylist = onPlayPlaylist,
+                    )
+                    2 -> FavoritesTab(
+                        snap = snap,
+                        onPlay = onPlay,
+                        onToggleFavorite = onToggleFavorite,
+                        onBrowseLibrary = { tab = 0 },
+                    )
+                    3 -> HistoryTab(
+                        snap = snap,
+                        onPlay = { id ->
+                            val track = snap.library.firstOrNull { it.id == id } ?: return@HistoryTab
+                            onPlay(track)
+                        },
+                        onPauseHistory = onPauseHistory,
+                        onResumeHistory = onResumeHistory,
+                        onClearHistory = onClearHistory,
+                    )
+                    4 -> AppearanceTab(
+                        settings = snap.settings,
+                        onUpdate = onUpdateSettings,
+                        onImport = onImportSettings,
+                        onExport = onExportSettings,
+                    )
+                }
+            }
+
+            // Bottom Dock: Floating Mini Player + Liquid Glass Bottom Nav
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                if (snap.nowPlaying != null) {
+                    ConvxMiniPlayer(
+                        hazeState = hazeState,
+                        snap = snap,
+                        isFavorite = snap.favorites.contains(snap.nowPlaying?.id ?: ""),
+                        onTogglePlayPause = onTogglePlayPause,
+                        onToggleFavorite = {
+                            snap.nowPlaying?.let { onToggleFavorite(it.id) }
+                        },
+                        onClick = { showFullPlayer = true },
+                    )
+                }
+
+                ConvxBottomNavBar(
+                    hazeState = hazeState,
+                    selectedTab = tab,
+                    onSelectTab = { tab = it },
+                )
+            }
+        }
+
+        // Full Player Modal Dialog
+        if (showFullPlayer && snap.nowPlaying != null) {
+            ConvxFullPlayerDialog(
+                hazeState = hazeState,
                 snap = snap,
+                isFavorite = snap.favorites.contains(snap.nowPlaying?.id ?: ""),
+                onDismiss = { showFullPlayer = false },
                 onTogglePlayPause = onTogglePlayPause,
                 onSeek = onSeek,
                 onNext = onNext,
@@ -369,68 +526,318 @@ fun MainScreen(
                 onToggleRepeat = onToggleRepeat,
                 onSkipForward = onSkipForward,
                 onSkipBackward = onSkipBackward,
+                onToggleFavorite = {
+                    snap.nowPlaying?.let { onToggleFavorite(it.id) }
+                },
             )
+        }
 
-            snap.scanError?.let { err ->
-                Text(
-                    text = "\u26a0\ufe0f $err",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(horizontal = 16.dp),
+        settingsMessage?.let { message ->
+            AlertDialog(
+                onDismissRequest = onDismissSettingsMessage,
+                title = { Text("Appearance") },
+                text = { Text(message) },
+                confirmButton = {
+                    TextButton(onClick = onDismissSettingsMessage) { Text("OK") }
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun ConvxHeader(
+    hazeState: HazeState,
+    folderName: String,
+    trackCount: Int,
+    onChooseFolder: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .liquidGlass(
+                hazeState = hazeState,
+                shape = RoundedCornerShape(18.dp),
+                backgroundColor = Color(0x35111728),
+                elevation = 4.dp,
+            )
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xFF101723))
+                    .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(12.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                androidx.compose.foundation.Image(
+                    painter = androidx.compose.ui.res.painterResource(id = com.never.nocturne.R.drawable.nocturne_icon),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(RoundedCornerShape(10.dp)),
                 )
             }
+            Column {
+                Text(
+                    text = "Nocturne",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = GlassTheme.TextPrimary,
+                    letterSpacing = 0.5.sp,
+                )
+                Text(
+                    text = if (trackCount > 0) "$folderName • $trackCount tracks" else "No folder selected",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = GlassTheme.TextSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
 
-            PrimaryTabRow(selectedTabIndex = tab) {
-                tabs.forEachIndexed { i, label ->
-                    Tab(selected = tab == i, onClick = { tab = i }, text = { Text(label) })
+        Spacer(modifier = Modifier.width(8.dp))
+
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(20.dp))
+                .background(Color(0x25FFFFFF))
+                .border(1.dp, Color(0x30FFFFFF), RoundedCornerShape(20.dp))
+                .clickable { onChooseFolder() }
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Icon(
+                imageVector = PlayerIcons.Folder,
+                contentDescription = "Folder",
+                tint = GlassTheme.Accent,
+                modifier = Modifier.size(16.dp),
+            )
+            Text(
+                text = "Folder",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = GlassTheme.TextPrimary,
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ConvxBottomNavBar(
+    hazeState: HazeState,
+    selectedTab: Int,
+    onSelectTab: (Int) -> Unit,
+) {
+    // Keep destination names clear across phone sizes.
+    val items = listOf(
+        Pair(PlayerIcons.MusicNote, "Library"),
+        Pair(PlayerIcons.Playlists, "Playlists"),
+        Pair(PlayerIcons.Favorite, "Favorites"),
+        Pair(PlayerIcons.History, "History"),
+        Pair(PlayerIcons.Sliders, "Settings"),
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .liquidGlass(
+                hazeState = hazeState,
+                shape = RoundedCornerShape(30.dp),
+                backgroundColor = Color(0x650D1322),
+                elevation = 8.dp,
+            )
+            .padding(horizontal = 8.dp, vertical = 8.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceAround,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            items.forEachIndexed { index, (icon, label) ->
+                val isSelected = selectedTab == index
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { onSelectTab(index) }
+                        .padding(vertical = 6.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(3.dp),
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = label,
+                        tint = if (isSelected) GlassTheme.Accent else GlassTheme.TextMuted,
+                        modifier = Modifier.size(22.dp),
+                    )
+                    Text(
+                        text = label,
+                        fontSize = 10.sp,
+                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                        color = if (isSelected) GlassTheme.Accent else GlassTheme.TextMuted,
+                        maxLines = 1,
+                    )
+                    // Active dot indicator
+                    Box(
+                        modifier = Modifier
+                            .size(if (isSelected) 5.dp else 0.dp)
+                            .clip(CircleShape)
+                            .background(GlassTheme.Accent),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConvxMiniPlayer(
+    hazeState: HazeState,
+    snap: LocalPlayerSnapshot,
+    isFavorite: Boolean,
+    onTogglePlayPause: () -> Unit,
+    onToggleFavorite: () -> Unit,
+    onClick: () -> Unit,
+) {
+    val now = snap.nowPlaying ?: return
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .liquidGlass(
+                hazeState = hazeState,
+                shape = RoundedCornerShape(20.dp),
+                backgroundColor = Color(0x6510172A),
+                elevation = 10.dp,
+            )
+            .clickable { onClick() },
+    ) {
+        Column {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                // Artwork thumbnail with Coil AsyncImage or fallback
+                val artPath = now.artPath
+                if (!artPath.isNullOrBlank() && File(artPath).exists()) {
+                    AsyncImage(
+                        model = File(artPath),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(46.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .border(1.dp, Color(0x35FFFFFF), RoundedCornerShape(12.dp)),
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size(46.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(
+                                Brush.linearGradient(
+                                    listOf(Color(0xFF243048), Color(0xFF151B27))
+                                )
+                            )
+                            .border(1.dp, Color(0x25FFFFFF), RoundedCornerShape(12.dp)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = PlayerIcons.MusicNote,
+                            contentDescription = null,
+                            tint = GlassTheme.Accent,
+                            modifier = Modifier.size(22.dp),
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                // Title & Artist
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = now.title,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = GlassTheme.TextPrimary,
+                    )
+                    Text(
+                        text = now.artist ?: "Local Track",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = GlassTheme.TextSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+
+                // Controls
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    IconButton(
+                        onClick = onToggleFavorite,
+                        modifier = Modifier.size(48.dp),
+                    ) {
+                        Icon(
+                            imageVector = if (isFavorite) PlayerIcons.Favorite else PlayerIcons.FavoriteBorder,
+                            contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
+                            tint = if (isFavorite) GlassTheme.Accent else GlassTheme.TextSecondary,
+                            modifier = Modifier.size(19.dp),
+                        )
+                    }
+
+                    IconButton(
+                        onClick = onTogglePlayPause,
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(GlassTheme.Accent),
+                    ) {
+                        Icon(
+                            imageVector = if (snap.isPlaying) PlayerIcons.Pause else PlayerIcons.Play,
+                            contentDescription = if (snap.isPlaying) "Pause" else "Play",
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
                 }
             }
 
-            when (tab) {
-                0 -> LibraryTab(
-                    snap = snap,
-                    onPlay = onPlay,
-                    onSearch = onSearch,
-                    onToggleFavorite = onToggleFavorite,
-                    onAddToPlaylist = onAddToPlaylist,
-                )
-                1 -> PlaylistsTab(
-                    snap = snap,
-                    onCreatePlaylist = onCreatePlaylist,
-                    onDeletePlaylist = onDeletePlaylist,
-                    onPlayPlaylist = onPlayPlaylist,
-                )
-                2 -> FavoritesTab(
-                    snap = snap,
-                    onPlay = onPlay,
-                    onToggleFavorite = onToggleFavorite,
-                )
-                3 -> HistoryTab(
-                    snap = snap,
-                    onPlay = { id ->
-                        val track = snap.library.firstOrNull { it.id == id } ?: return@HistoryTab
-                        onPlay(track)
-                    },
-                    onPauseHistory = onPauseHistory,
-                    onResumeHistory = onResumeHistory,
-                    onClearHistory = onClearHistory,
-                )
-                4 -> AppearanceTab(
-                    settings = snap.settings,
-                    onUpdate = onUpdateSettings,
-                    onImport = onImportSettings,
-                    onExport = onExportSettings,
-                )
-            }
+            // Real-time micro progress indicator at the bottom
+            val progress = if (snap.durationMs > 0) {
+                (snap.positionMs.toFloat() / snap.durationMs.toFloat()).coerceIn(0f, 1f)
+            } else 0f
 
-            settingsMessage?.let { message ->
-                AlertDialog(
-                    onDismissRequest = onDismissSettingsMessage,
-                    title = { Text("Appearance") },
-                    text = { Text(message) },
-                    confirmButton = {
-                        TextButton(onClick = onDismissSettingsMessage) { Text("OK") }
-                    },
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(3.dp)
+                    .background(Color(0x20FFFFFF))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(fraction = progress)
+                        .fillMaxHeight()
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(GlassTheme.Accent, GlassTheme.AccentPurple)
+                            )
+                        )
                 )
             }
         }
@@ -438,8 +845,11 @@ fun MainScreen(
 }
 
 @Composable
-private fun NowPlayingStrip(
+private fun ConvxFullPlayerDialog(
+    hazeState: HazeState,
     snap: LocalPlayerSnapshot,
+    isFavorite: Boolean,
+    onDismiss: () -> Unit,
     onTogglePlayPause: () -> Unit,
     onSeek: (Long) -> Unit,
     onNext: () -> Unit,
@@ -448,51 +858,334 @@ private fun NowPlayingStrip(
     onToggleRepeat: () -> Unit,
     onSkipForward: () -> Unit,
     onSkipBackward: () -> Unit,
+    onToggleFavorite: () -> Unit,
 ) {
-    val now = snap.nowPlaying
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+    val now = snap.nowPlaying ?: return
+    val ambientColors = rememberArtworkColors(now.artPath)
+    val albumName = now.album.orEmpty()
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
-        if (now != null) {
-            Text(now.title, style = MaterialTheme.typography.titleSmall)
-            now.artist?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-            if (snap.durationMs > 0) {
-                Slider(
-                    value = snap.positionMs.toFloat(),
-                    onValueChange = { onSeek(it.toLong()) },
-                    valueRange = 0f..snap.durationMs.toFloat(),
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(GlassTheme.Background)
+        ) {
+            // Ambient dynamic mesh behind full player
+            AndroidMeshBackground(colors = ambientColors)
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 24.dp, vertical = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceBetween,
+            ) {
+                // Drag handle pill at the top
+                Box(
+                    modifier = Modifier
+                        .width(42.dp)
+                        .height(5.dp)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(Color(0x40FFFFFF))
+                        .clickable { onDismiss() }
                 )
+
+                // Top Header Row
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(formatMs(snap.positionMs), style = MaterialTheme.typography.labelSmall)
-                    Text(formatMs(snap.durationMs), style = MaterialTheme.typography.labelSmall)
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(Color(0x25FFFFFF)),
+                    ) {
+                        Icon(
+                            imageVector = PlayerIcons.Close,
+                            contentDescription = "Close",
+                            tint = GlassTheme.TextPrimary,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                    Text(
+                        text = "NOW PLAYING",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.8.sp,
+                        color = GlassTheme.TextSecondary,
+                    )
+                    IconButton(
+                        onClick = onToggleFavorite,
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(if (isFavorite) GlassTheme.Accent.copy(alpha = 0.25f) else Color(0x25FFFFFF)),
+                    ) {
+                        Icon(
+                            imageVector = if (isFavorite) PlayerIcons.Favorite else PlayerIcons.FavoriteBorder,
+                            contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
+                            tint = if (isFavorite) GlassTheme.Accent else GlassTheme.TextPrimary,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
                 }
-            }
-        } else {
-            Text("No track playing", style = MaterialTheme.typography.bodySmall)
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            TextButton(onClick = onSkipBackward) { Text("\u00ab10s") }
-            TextButton(onClick = onPrevious) { Text("\u23ee") }
-            Button(onClick = onTogglePlayPause) {
-                Text(if (snap.isPlaying) "\u23f8" else "\u25b6")
-            }
-            TextButton(onClick = onNext) { Text("\u23ed") }
-            TextButton(onClick = onSkipForward) { Text("10s\u00bb") }
-            TextButton(onClick = onToggleShuffle) {
-                Text(if (snap.isShuffle) "Shuf\u2713" else "Shuf")
-            }
-            TextButton(onClick = onToggleRepeat) {
-                Text(if (snap.isRepeat) "Rep\u2713" else "Rep")
+
+                // Big Album Artwork Card with ambient shadow & specular border
+                val fullArtPath = now.artPath
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .widthIn(max = 360.dp)
+                            .fillMaxWidth(0.85f)
+                            .aspectRatio(1f)
+                            .shadow(30.dp, RoundedCornerShape(30.dp), spotColor = ambientColors.firstOrNull() ?: GlassTheme.AccentGlow)
+                            .clip(RoundedCornerShape(30.dp))
+                            .background(Color(0x35141D30))
+                            .border(1.5.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(30.dp)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (!fullArtPath.isNullOrBlank() && File(fullArtPath).exists()) {
+                            AsyncImage(
+                                model = File(fullArtPath),
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(
+                                        Brush.linearGradient(
+                                            listOf(
+                                                Color(0xFF171E2E),
+                                                Color(0xFF101722),
+                                            )
+                                        )
+                                    ),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    imageVector = PlayerIcons.MusicNote,
+                                    contentDescription = null,
+                                    tint = GlassTheme.Accent,
+                                    modifier = Modifier.size(88.dp),
+                                )
+                            }
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopStart)
+                                .padding(14.dp)
+                                .clip(RoundedCornerShape(999.dp))
+                                .background(Color(0x7A0F172A))
+                                .border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(999.dp))
+                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                        ) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(7.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .clip(CircleShape)
+                                        .background(GlassTheme.Accent),
+                                )
+                                Text(
+                                    text = "Now playing",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    letterSpacing = 1.2.sp,
+                                    color = GlassTheme.TextPrimary,
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Track Title & Artist
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.padding(horizontal = 18.dp),
+                ) {
+                    Text(
+                        text = now.title,
+                        fontSize = 30.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = GlassTheme.TextPrimary,
+                        textAlign = TextAlign.Center,
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = now.artist ?: "Local Track",
+                        fontSize = 15.sp,
+                        color = GlassTheme.TextSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
+                    )
+                    if (albumName.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = albumName,
+                            fontSize = 12.sp,
+                            color = GlassTheme.TextMuted,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = Color(0x1AFFFFFF).copy(alpha = 0.06f),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.06f)),
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "Queue",
+                            fontSize = 11.sp,
+                            letterSpacing = 1.2.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = GlassTheme.TextSecondary,
+                        )
+                        Text(
+                            text = if (snap.queue.isNotEmpty()) "${snap.queue.size} up next" else "empty",
+                            fontSize = 11.sp,
+                            color = GlassTheme.TextMuted,
+                        )
+                    }
+                }
+
+                // Progress Bar & Duration Labels
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    val progressFraction = if (snap.durationMs > 0) {
+                        (snap.positionMs.toFloat() / snap.durationMs.toFloat()).coerceIn(0f, 1f)
+                    } else 0f
+
+                    CupertinoSeekSlider(
+                        value = progressFraction,
+                        onValueChange = { fraction ->
+                            onSeek((fraction * snap.durationMs).toLong())
+                        },
+                    )
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 2.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(
+                            text = formatMs(snap.positionMs),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = GlassTheme.TextMuted,
+                        )
+                        Text(
+                            text = formatMs(snap.durationMs),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = GlassTheme.TextMuted,
+                        )
+                    }
+                }
+
+                // Transport Controls
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(
+                        onClick = onPrevious,
+                        modifier = Modifier.size(48.dp),
+                    ) {
+                        Icon(
+                            imageVector = PlayerIcons.SkipPrev,
+                            contentDescription = "Previous",
+                            tint = GlassTheme.TextPrimary,
+                            modifier = Modifier.size(28.dp),
+                        )
+                    }
+
+                    CupertinoGlassButton(
+                        onClick = onTogglePlayPause,
+                        size = 68.dp,
+                        icon = if (snap.isPlaying) PlayerIcons.Pause else PlayerIcons.Play,
+                        iconSize = 30.dp,
+                        iconTint = Color.White,
+                        backgroundColor = GlassTheme.Accent,
+                        glowColor = GlassTheme.Accent,
+                    )
+
+                    IconButton(
+                        onClick = onNext,
+                        modifier = Modifier.size(48.dp),
+                    ) {
+                        Icon(
+                            imageVector = PlayerIcons.SkipNext,
+                            contentDescription = "Next",
+                            tint = GlassTheme.TextPrimary,
+                            modifier = Modifier.size(28.dp),
+                        )
+                    }
+                }
+
+                // Bottom Pills Row: Shuffle, -10s, +10s, Repeat
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    CupertinoPillToggle(
+                        active = snap.isShuffle,
+                        onClick = onToggleShuffle,
+                        icon = PlayerIcons.Shuffle,
+                    )
+
+                    CupertinoPillToggle(
+                        active = false,
+                        onClick = onSkipBackward,
+                        icon = PlayerIcons.SkipPrev,
+                        label = "-10s",
+                    )
+
+                    CupertinoPillToggle(
+                        active = false,
+                        onClick = onSkipForward,
+                        icon = PlayerIcons.SkipNext,
+                        label = "+10s",
+                    )
+
+                    CupertinoPillToggle(
+                        active = snap.isRepeat,
+                        onClick = onToggleRepeat,
+                        icon = PlayerIcons.Repeat,
+                    )
+                }
             }
         }
     }
@@ -501,44 +1194,392 @@ private fun NowPlayingStrip(
 @Composable
 private fun LibraryTab(
     snap: LocalPlayerSnapshot,
+    onChooseFolder: () -> Unit,
     onPlay: (TrackView) -> Unit,
     onSearch: (String) -> Unit,
     onToggleFavorite: (String) -> Unit,
     onAddToPlaylist: (String, TrackView) -> Unit,
 ) {
     var showAddDialog by remember { mutableStateOf<TrackView?>(null) }
+    val currentTrackId = snap.nowPlaying?.id
 
-    Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp),
+    ) {
+        // Convx Style Search Pill
         OutlinedTextField(
             value = snap.searchQuery,
             onValueChange = onSearch,
-            label = { Text("Search") },
+            placeholder = { Text("Search songs, artists, albums...", color = GlassTheme.TextMuted, fontSize = 14.sp) },
+            leadingIcon = {
+                Icon(
+                    imageVector = PlayerIcons.Search,
+                    contentDescription = "Search",
+                    tint = GlassTheme.TextMuted,
+                    modifier = Modifier.size(18.dp),
+                )
+            },
+            trailingIcon = {
+                if (snap.searchQuery.isNotEmpty()) {
+                    IconButton(onClick = { onSearch("") }) {
+                        Icon(
+                            imageVector = PlayerIcons.Close,
+                            contentDescription = "Clear search",
+                            tint = GlassTheme.TextMuted,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                }
+            },
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = Color(0x35141D30),
+                unfocusedContainerColor = Color(0x20141D30),
+                focusedBorderColor = GlassTheme.Accent.copy(alpha = 0.6f),
+                unfocusedBorderColor = Color(0x22FFFFFF),
+                cursorColor = GlassTheme.Accent,
+                focusedTextColor = GlassTheme.TextPrimary,
+                unfocusedTextColor = GlassTheme.TextPrimary,
+                focusedLeadingIconColor = GlassTheme.Accent,
+                unfocusedLeadingIconColor = GlassTheme.TextMuted,
+                focusedTrailingIconColor = GlassTheme.TextMuted,
+                unfocusedTrailingIconColor = GlassTheme.TextMuted,
+                focusedPlaceholderColor = GlassTheme.TextMuted,
+                unfocusedPlaceholderColor = GlassTheme.TextMuted,
+            ),
             singleLine = true,
-            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+            shape = RoundedCornerShape(18.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
         )
+
         val visible = if (snap.searchQuery.isBlank()) snap.library else snap.filteredLibrary
+        val recentTracks = if (snap.searchQuery.isBlank()) {
+            snap.history
+                .mapNotNull { entry -> snap.library.firstOrNull { it.id == entry.trackId } }
+                .distinctBy { it.id }
+                .take(8)
+        } else {
+            emptyList()
+        }
+
         if (visible.isEmpty()) {
             Box(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(vertical = 32.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(
-                    if (snap.library.isEmpty())
-                        "No tracks \u2014 tap Folder to add music"
-                    else
-                        "No results for \u201c${snap.searchQuery}\u201d"
-                )
+                if (snap.library.isEmpty()) {
+                    Surface(
+                        shape = RoundedCornerShape(24.dp),
+                        color = Color(0xFF101823).copy(alpha = 0.9f),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.06f)),
+                        tonalElevation = 0.dp,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp),
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp, vertical = 28.dp),
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(62.dp)
+                                    .clip(RoundedCornerShape(18.dp))
+                                    .background(Color(0xFF121C2C))
+                                    .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(18.dp)),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    imageVector = PlayerIcons.MusicNote,
+                                    contentDescription = null,
+                                    tint = GlassTheme.Accent,
+                                    modifier = Modifier.size(28.dp),
+                                )
+                            }
+                            Text(
+                                text = "Your library starts here",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = GlassTheme.TextPrimary,
+                                textAlign = TextAlign.Center,
+                            )
+                            Text(
+                                text = "Choose a music folder to add your tracks.",
+                                color = GlassTheme.TextSecondary,
+                                textAlign = TextAlign.Center,
+                            )
+                            Button(
+                                onClick = onChooseFolder,
+                                shape = RoundedCornerShape(14.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = GlassTheme.Accent,
+                                    contentColor = Color.White,
+                                ),
+                            ) {
+                                Text("Choose music folder")
+                            }
+                        }
+                    }
+                } else {
+                    Surface(
+                        shape = RoundedCornerShape(18.dp),
+                        color = Color(0xFF121924).copy(alpha = 0.7f),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.06f)),
+                        modifier = Modifier.padding(horizontal = 8.dp),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 18.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = "No results for \u201c${snap.searchQuery}\u201d",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
             }
         } else {
-            Text(
-                "${visible.size} track${if (visible.size != 1) "s" else ""}",
-                style = MaterialTheme.typography.labelLarge,
-            )
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            if (recentTracks.isNotEmpty()) {
+                val featuredTrack = recentTracks.first()
+                val compactRecents = recentTracks.drop(1)
+
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "Recently played",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = GlassTheme.TextPrimary,
+                        )
+                        TextButton(onClick = onChooseFolder) {
+                            Text("Browse folder", color = GlassTheme.Accent)
+                        }
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(22.dp),
+                        color = Color(0xFF0F1728).copy(alpha = 0.96f),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onPlay(featuredTrack) }
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(110.dp)
+                                    .clip(RoundedCornerShape(18.dp))
+                                    .background(
+                                        Brush.linearGradient(
+                                            listOf(
+                                                GlassTheme.Accent.copy(alpha = 0.35f),
+                                                Color(0xFF121B2A),
+                                            )
+                                        )
+                                    )
+                                    .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(18.dp)),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                val artPath = featuredTrack.artPath
+                                if (!artPath.isNullOrBlank() && File(artPath).exists()) {
+                                    AsyncImage(
+                                        model = File(artPath),
+                                        contentDescription = null,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize(),
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = PlayerIcons.MusicNote,
+                                        contentDescription = null,
+                                        tint = GlassTheme.Accent,
+                                        modifier = Modifier.size(32.dp),
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.width(14.dp))
+
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(5.dp),
+                            ) {
+                                Text(
+                                    text = "Resume listening",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = GlassTheme.TextSecondary,
+                                    letterSpacing = 0.8.sp,
+                                )
+                                Text(
+                                    text = featuredTrack.title,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = GlassTheme.TextPrimary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Text(
+                                    text = featuredTrack.artist ?: "Unknown Artist",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = GlassTheme.TextSecondary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Text(
+                                    text = formatMs(featuredTrack.durationMs),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = GlassTheme.TextMuted,
+                                )
+                            }
+
+                            Button(
+                                onClick = { onPlay(featuredTrack) },
+                                shape = RoundedCornerShape(14.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = GlassTheme.Accent,
+                                    contentColor = Color.White,
+                                ),
+                                modifier = Modifier.widthIn(min = 84.dp),
+                            ) {
+                                Text("Play")
+                            }
+                        }
+                    }
+
+                    if (compactRecents.isNotEmpty()) {
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            items(compactRecents, key = { it.id }) { track ->
+                                Column(
+                                    modifier = Modifier
+                                        .width(124.dp)
+                                        .clickable { onPlay(track) },
+                                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .aspectRatio(1f)
+                                            .clip(RoundedCornerShape(14.dp))
+                                            .background(
+                                                Brush.linearGradient(
+                                                    listOf(
+                                                        GlassTheme.Accent.copy(alpha = 0.22f),
+                                                        Color(0xFF121B2A),
+                                                    )
+                                                )
+                                            )
+                                            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(14.dp)),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        val artPath = track.artPath
+                                        if (!artPath.isNullOrBlank() && File(artPath).exists()) {
+                                            AsyncImage(
+                                                model = File(artPath),
+                                                contentDescription = null,
+                                                contentScale = ContentScale.Crop,
+                                                modifier = Modifier.fillMaxSize(),
+                                            )
+                                        } else {
+                                            Icon(
+                                                imageVector = PlayerIcons.MusicNote,
+                                                contentDescription = null,
+                                                tint = GlassTheme.Accent,
+                                                modifier = Modifier.size(24.dp),
+                                            )
+                                        }
+                                    }
+                                    Text(
+                                        text = track.title,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = GlassTheme.TextPrimary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Text(
+                                        text = track.artist ?: "Unknown Artist",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = GlassTheme.TextSecondary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (snap.searchQuery.isBlank()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    val stats = listOf(
+                        "${visible.size} tracks" to "Library",
+                        "${snap.favorites.size} favorites" to "Loved",
+                        "${snap.history.size} recent" to "History",
+                    )
+                    stats.forEach { (value, label) ->
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color(0xFF121924).copy(alpha = 0.72f),
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.06f)),
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                verticalArrangement = Arrangement.spacedBy(2.dp),
+                            ) {
+                                Text(
+                                    text = value,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = GlassTheme.TextPrimary,
+                                )
+                                Text(
+                                    text = label,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = GlassTheme.TextSecondary,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 items(visible, key = { it.id }) { track ->
                     TrackRow(
                         track = track,
                         isFavorite = snap.favorites.contains(track.id),
+                        isPlayingThis = track.id == currentTrackId,
                         onPlay = { onPlay(track) },
                         onToggleFavorite = { onToggleFavorite(track.id) },
                         onAddToPlaylist = if (snap.playlists.isNotEmpty()) {
@@ -566,27 +1607,121 @@ private fun LibraryTab(
 private fun TrackRow(
     track: TrackView,
     isFavorite: Boolean,
+    isPlayingThis: Boolean = false,
     onPlay: () -> Unit,
     onToggleFavorite: () -> Unit,
     onAddToPlaylist: (() -> Unit)?,
 ) {
-    Row(
+    Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onPlay() }
-            .padding(vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
+            .clickable { onPlay() },
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isPlayingThis) Color(0xFF141C2E).copy(alpha = 0.88f)
+            else Color(0xFF121924).copy(alpha = 0.7f),
+        ),
+        border = BorderStroke(
+            1.dp,
+            if (isPlayingThis) GlassTheme.Accent.copy(alpha = 0.45f)
+            else Color.White.copy(alpha = 0.06f)
+        ),
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(track.title, style = MaterialTheme.typography.bodyMedium)
-            track.artist?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-        }
-        TextButton(onClick = onToggleFavorite) {
-            Text(if (isFavorite) "\u2665" else "\u2661")
-        }
-        if (onAddToPlaylist != null) {
-            TextButton(onClick = onAddToPlaylist) { Text("+PL") }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (isPlayingThis) {
+                Box(
+                    modifier = Modifier
+                        .size(width = 3.dp, height = 28.dp)
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(GlassTheme.Accent),
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+            }
+            // Artwork square
+            val rowArt = track.artPath
+            if (!rowArt.isNullOrBlank() && File(rowArt).exists()) {
+                AsyncImage(
+                    model = File(rowArt),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(46.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .border(1.dp, Color(0x35FFFFFF), RoundedCornerShape(10.dp)),
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(46.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(
+                            Brush.linearGradient(
+                                listOf(
+                                    if (isPlayingThis) GlassTheme.Accent.copy(alpha = 0.35f)
+                                    else Color(0xFF222B3D),
+                                    Color(0xFF141926),
+                                )
+                            )
+                        )
+                        .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)), RoundedCornerShape(10.dp)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = if (isPlayingThis) PlayerIcons.Play else PlayerIcons.MusicNote,
+                        contentDescription = null,
+                        tint = if (isPlayingThis) GlassTheme.Accent else GlassTheme.TextSecondary,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = track.title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = GlassTheme.TextPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                track.artist?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = GlassTheme.TextSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onToggleFavorite) {
+                    Icon(
+                        imageVector = if (isFavorite) PlayerIcons.Favorite else PlayerIcons.FavoriteBorder,
+                        contentDescription = "Favorite",
+                        tint = if (isFavorite) GlassTheme.Accent else GlassTheme.TextMuted,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+                if (onAddToPlaylist != null) {
+                    IconButton(onClick = onAddToPlaylist) {
+                        Icon(
+                            imageVector = PlayerIcons.Plus,
+                            contentDescription = "Add to playlist",
+                            tint = GlassTheme.TextMuted,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -602,20 +1737,61 @@ private fun PlaylistsTab(
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("Playlists (${snap.playlists.size})", style = MaterialTheme.typography.titleSmall)
-            TextButton(onClick = { showCreate = true }) { Text("New") }
+            Text(
+                text = "Playlists (${snap.playlists.size})",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+            )
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
+                modifier = Modifier.clickable { showCreate = true },
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = PlayerIcons.Plus,
+                        contentDescription = "New",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "New",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
         }
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            items(snap.playlists, key = { it.id }) { pl ->
-                PlaylistRow(
-                    pl = pl,
-                    onPlay = { onPlayPlaylist(pl.id) },
-                    onDelete = { onDeletePlaylist(pl.id) },
+
+        if (snap.playlists.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxSize().padding(vertical = 32.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "No playlists yet \u2014 tap New to create one",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+        } else {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(snap.playlists, key = { it.id }) { pl ->
+                    PlaylistRow(
+                        pl = pl,
+                        onPlay = { onPlayPlaylist(pl.id) },
+                        onDelete = { onDeletePlaylist(pl.id) },
+                    )
+                }
             }
         }
     }
@@ -633,20 +1809,64 @@ private fun PlaylistsTab(
 
 @Composable
 private fun PlaylistRow(pl: Playlist, onPlay: () -> Unit, onDelete: () -> Unit) {
-    Row(
+    Card(
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFF131824).copy(alpha = 0.6f),
+        ),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.06f)),
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onPlay() }
-            .padding(vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
+            .clickable { onPlay() },
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(pl.name, style = MaterialTheme.typography.bodyMedium)
-            Text("${pl.tracks.size} track${if (pl.tracks.size != 1) "s" else ""}",
-                style = MaterialTheme.typography.bodySmall)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(
+                            Brush.linearGradient(
+                                listOf(Color(0xFF222B3D), Color(0xFF141926))
+                            )
+                        )
+                        .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)), RoundedCornerShape(10.dp)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = PlayerIcons.Playlists,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(
+                        text = pl.name,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        text = "${pl.tracks.size} track${if (pl.tracks.size != 1) "s" else ""}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            TextButton(onClick = onDelete) {
+                Text("Delete", color = MaterialTheme.colorScheme.error)
+            }
         }
-        TextButton(onClick = onDelete) { Text("Del") }
     }
 }
 
@@ -655,22 +1875,85 @@ private fun FavoritesTab(
     snap: LocalPlayerSnapshot,
     onPlay: (TrackView) -> Unit,
     onToggleFavorite: (String) -> Unit,
+    onBrowseLibrary: () -> Unit,
 ) {
     val favTracks = snap.library.filter { snap.favorites.contains(it.id) }
+    val currentTrackId = snap.nowPlaying?.id
+
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         if (favTracks.isEmpty()) {
-            Box(modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
-                contentAlignment = Alignment.Center) {
-                Text("No favorites yet \u2014 tap \u2661 in the library")
+            Box(
+                modifier = Modifier.fillMaxSize().padding(vertical = 32.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(24.dp),
+                    color = Color(0xFF101823).copy(alpha = 0.9f),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.06f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp),
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp, vertical = 28.dp),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(58.dp)
+                                .clip(RoundedCornerShape(18.dp))
+                                .background(Color(0xFF121C2C))
+                                .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(18.dp)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = PlayerIcons.Favorite,
+                                contentDescription = null,
+                                tint = GlassTheme.Accent,
+                                modifier = Modifier.size(24.dp),
+                            )
+                        }
+                        Text(
+                            text = "No favorites yet",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = GlassTheme.TextPrimary,
+                        )
+                        Text(
+                            text = "Save tracks from your library to find them here.",
+                            color = GlassTheme.TextSecondary,
+                            textAlign = TextAlign.Center,
+                        )
+                        Button(
+                            onClick = onBrowseLibrary,
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = GlassTheme.Accent,
+                                contentColor = Color.White,
+                            ),
+                        ) {
+                            Text("Browse library")
+                        }
+                    }
+                }
             }
         } else {
-            Text("${favTracks.size} favorite${if (favTracks.size != 1) "s" else ""}",
-                style = MaterialTheme.typography.labelLarge)
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text = "${favTracks.size} favorite${if (favTracks.size != 1) "s" else ""}",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(favTracks, key = { it.id }) { track ->
                     TrackRow(
                         track = track,
                         isFavorite = true,
+                        isPlayingThis = track.id == currentTrackId,
                         onPlay = { onPlay(track) },
                         onToggleFavorite = { onToggleFavorite(track.id) },
                         onAddToPlaylist = null,
@@ -691,42 +1974,121 @@ private fun HistoryTab(
 ) {
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("History", style = MaterialTheme.typography.titleSmall)
-            if (snap.isHistoryPaused) {
-                TextButton(onClick = onResumeHistory) { Text("Resume") }
-            } else {
-                TextButton(onClick = onPauseHistory) { Text("Pause") }
+            Text(
+                text = "History",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (snap.isHistoryPaused) {
+                    TextButton(onClick = onResumeHistory) { Text("Resume") }
+                } else {
+                    TextButton(onClick = onPauseHistory) { Text("Pause") }
+                }
+                TextButton(onClick = onClearHistory) { Text("Clear") }
             }
-            TextButton(onClick = onClearHistory) { Text("Clear") }
         }
         if (snap.isHistoryPaused) {
-            Text("History recording paused",
+            Text(
+                text = "History recording paused",
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.secondary)
+                color = MaterialTheme.colorScheme.secondary,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
         }
         if (snap.history.isEmpty()) {
-            Box(modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
-                contentAlignment = Alignment.Center) {
-                Text("No history yet")
+            Box(
+                modifier = Modifier.fillMaxSize().padding(vertical = 32.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = Color(0xFF121924).copy(alpha = 0.7f),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.06f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp),
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 22.dp),
+                    ) {
+                        Icon(
+                            imageVector = PlayerIcons.History,
+                            contentDescription = null,
+                            tint = GlassTheme.Accent,
+                            modifier = Modifier.size(32.dp),
+                        )
+                        Text(
+                            text = "No history yet",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = GlassTheme.TextPrimary,
+                        )
+                        Text(
+                            text = "Play a few tracks and your listening history will appear here.",
+                            color = GlassTheme.TextSecondary,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                }
             }
         } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(snap.history, key = { "${it.trackId}-${it.playedAtMs}" }) { entry ->
-                    Row(
+                    Card(
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = Color(0xFF131824).copy(alpha = 0.5f),
+                        ),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f)),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { onPlay(entry.trackId) }
-                            .padding(vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+                            .clickable { onPlay(entry.trackId) },
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(entry.title, style = MaterialTheme.typography.bodyMedium)
-                            entry.artist?.let {
-                                Text(it, style = MaterialTheme.typography.bodySmall)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(
+                                        Brush.linearGradient(
+                                            listOf(GlassTheme.Accent.copy(alpha = 0.32f), Color(0xFF1B2232))
+                                        )
+                                    ),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    imageVector = PlayerIcons.History,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = entry.title,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.Medium,
+                                )
+                                entry.artist?.let {
+                                    Text(
+                                        text = it,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
                             }
                         }
                     }
@@ -745,19 +2107,21 @@ private fun CreatePlaylistDialog(onDismiss: () -> Unit, onConfirm: (String) -> U
     var name by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("New Playlist") },
+        title = { Text("New Playlist", fontWeight = FontWeight.Bold) },
         text = {
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
-                label = { Text("Name") },
+                label = { Text("Playlist Name") },
                 singleLine = true,
+                shape = RoundedCornerShape(14.dp),
             )
         },
         confirmButton = {
-            TextButton(
+            Button(
                 onClick = { if (name.isNotBlank()) onConfirm(name) },
                 enabled = name.isNotBlank(),
+                shape = RoundedCornerShape(12.dp),
             ) { Text("Create") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
@@ -772,14 +2136,39 @@ private fun AddToPlaylistDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add to Playlist") },
+        title = { Text("Add to Playlist", fontWeight = FontWeight.Bold) },
         text = {
-            LazyColumn {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 items(playlists, key = { it.id }) { pl ->
-                    TextButton(
-                        onClick = { onConfirm(pl.id) },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) { Text(pl.name) }
+                    Card(
+                        shape = RoundedCornerShape(10.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onConfirm(pl.id) },
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                imageVector = PlayerIcons.Playlists,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = pl.name,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
+                            )
+                        }
+                    }
                 }
             }
         },
@@ -804,6 +2193,7 @@ private fun AppearanceSection(text: String) {
     )
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AppearanceTab(
     settings: AppSettings,
@@ -833,7 +2223,11 @@ private fun AppearanceTab(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         AppearanceSection("PRESET")
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(
+            maxItemsInEachRow = 2,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             ThemePresets.all.forEach { preset ->
                 val selected = preset.slug == activeSlug
                 Row(
@@ -859,7 +2253,12 @@ private fun AppearanceTab(
                             .clip(CircleShape)
                             .background(colorOf(preset.accent)),
                     )
-                    Text(preset.displayName, style = MaterialTheme.typography.labelMedium)
+                    Text(
+                        preset.displayName,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                    )
                 }
             }
         }

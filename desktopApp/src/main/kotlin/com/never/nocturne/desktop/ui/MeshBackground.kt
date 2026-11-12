@@ -1,4 +1,4 @@
-package com.never.localmusic.desktop.ui
+package com.never.nocturne.desktop.ui
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
@@ -156,18 +156,21 @@ private fun Color.shifted(hue: Float, lightness: Float): Color {
     return hslToColor(hsl)
 }
 
-/** Boost saturation and clamp lightness so any artwork yields a rich, non-muddy mesh. */
+/**
+ * Desaturate and clamp lightness so artwork colours stay a tint behind the glass
+ * instead of lighting the whole window. Bright covers used to turn the app green.
+ */
 internal fun Color.tuned(): Color {
     val hsl = hsl()
-    hsl[1] = (hsl[1] * 1.35f).coerceAtMost(1f)
-    hsl[2] = hsl[2].coerceIn(0.28f, 0.58f)
+    hsl[1] = (hsl[1] * 0.80f).coerceIn(0f, 0.65f)
+    hsl[2] = hsl[2].coerceIn(0.10f, 0.24f)
     return hslToColor(hsl)
 }
 
 /** The near-black the blobs are laid over, kept in the artwork's own hue. */
 internal fun Color.dimmed(): Color {
     val hsl = hsl()
-    hsl[2] = 0.12f
+    hsl[2] = 0.07f
     return hslToColor(hsl)
 }
 
@@ -271,7 +274,7 @@ fun ConvxMeshBackground(
             val radius = size.maxDimension * 0.62f
             drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(color.copy(alpha = 0.85f), color.copy(alpha = 0f)),
+                    colors = listOf(color.copy(alpha = 0.6f), color.copy(alpha = 0f)),
                     center = center,
                     radius = radius,
                 ),
@@ -280,12 +283,12 @@ fun ConvxMeshBackground(
             )
         }
 
-        // Gentle scrim so white text stays legible over bright art.
+        // Scrim so white text stays legible and the tint stays a backdrop, not a theme.
         drawRect(
             brush = Brush.verticalGradient(
                 colors = listOf(
-                    Color.Black.copy(alpha = 0.10f),
-                    Color.Black.copy(alpha = 0.38f),
+                    Color.Black.copy(alpha = 0.30f),
+                    Color.Black.copy(alpha = 0.55f),
                 ),
             ),
         )

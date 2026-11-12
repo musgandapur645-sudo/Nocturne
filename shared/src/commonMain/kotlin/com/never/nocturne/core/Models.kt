@@ -1,4 +1,4 @@
-package com.never.localmusic.core
+package com.never.nocturne.core
 
 /**
  * Stable local identity for a single track across the app and the index.

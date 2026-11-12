@@ -1,4 +1,4 @@
-package com.never.localmusic.shared
+package com.never.nocturne.shared
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -133,9 +133,9 @@ data class AppSettings(
         glassIntensity = glassIntensity.coerceIn(GLASS_MIN, GLASS_MAX),
     )
 
-    fun accentTokens(): AccentTokens = com.never.localmusic.shared.accentTokens(preset, accent)
+    fun accentTokens(): AccentTokens = com.never.nocturne.shared.accentTokens(preset, accent)
 
-    fun glassTokens(): GlassTokens = com.never.localmusic.shared.glassTokens(glassIntensity)
+    fun glassTokens(): GlassTokens = com.never.nocturne.shared.glassTokens(glassIntensity)
 }
 
 object SettingsCodec {
