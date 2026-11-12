@@ -87,6 +87,14 @@ cd nocturne
 ./gradlew :desktopApp:run
 ```
 
+### Windows notes
+
+Use `gradlew.bat`, and create `local.properties` with your SDK path (it is gitignored):
+
+```properties
+sdk.dir=C:/Users/<you>/AppData/Local/Android/Sdk
+```
+
 ## Usage
 
 ### Desktop
