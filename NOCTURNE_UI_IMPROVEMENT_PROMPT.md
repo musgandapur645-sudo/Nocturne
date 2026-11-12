@@ -63,7 +63,7 @@ implementation("io.github.alexzhirkevich:compose-cupertino:0.1.0-alpha04") // or
 
 ## Phase 3: Desktop Improvements
 
-Look at `desktopApp/src/main/kotlin/com/never/localmusic/desktop/Main.kt`
+Look at `desktopApp/src/main/kotlin/com/never/nocturne/desktop/Main.kt`
 
 Improvements:
 - **Glassmorphism**: Add frosted glass effects to sidebars, player bar, cards

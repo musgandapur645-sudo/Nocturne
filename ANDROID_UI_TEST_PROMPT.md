@@ -23,7 +23,7 @@ cd /home/never/Work/projects/local-music-player
 Must succeed with no errors.
 
 ### 2) Visual Inspection
-Open `androidApp/src/main/kotlin/com/never/localmusic/MainActivity.kt` and review:
+Open `androidApp/src/main/kotlin/com/never/nocturne/MainActivity.kt` and review:
 - [ ] NowPlayingStrip looks clean and modern
 - [ ] TrackRow uses cards properly
 - [ ] Icons are readable
