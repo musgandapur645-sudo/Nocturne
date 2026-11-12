@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.media.MediaMetadataRetriever
 import android.net.Uri
+import androidx.core.net.toUri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -417,7 +418,7 @@ fun MainScreen(
         ) {
             // Convx Liquid Glass Header
             val folderName = snap.library.firstOrNull()?.let {
-                Uri.parse(it.id).lastPathSegment?.substringBeforeLast('/')
+                it.id.toUri().lastPathSegment?.substringBeforeLast('/')
             } ?: "Music"
 
             ConvxHeader(

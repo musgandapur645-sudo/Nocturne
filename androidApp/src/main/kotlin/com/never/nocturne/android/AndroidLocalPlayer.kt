@@ -2,6 +2,7 @@ package com.never.nocturne.android
 
 import android.content.Context
 import android.net.Uri
+import androidx.core.net.toUri
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
@@ -432,7 +433,7 @@ class AndroidLocalPlayer(
     // ─────────────────────────────────────────────────────────────────────────
 
     private fun startMediaItem(view: TrackView) {
-        val item = MediaItem.Builder().setUri(Uri.parse(view.id)).setMediaId(view.id).build()
+        val item = MediaItem.Builder().setUri(view.id.toUri()).setMediaId(view.id).build()
         controller?.apply { setMediaItem(item); prepare(); playWhenReady = true }
         recordHistoryPlay(view)
     }

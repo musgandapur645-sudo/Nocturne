@@ -32,8 +32,8 @@ dependencies {
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.session)
 
-    implementation("dev.chrisbanes.haze:haze:1.6.10")
-    implementation("dev.chrisbanes.haze:haze-materials:1.6.10")
-    implementation("androidx.palette:palette-ktx:1.0.0")
-    implementation("io.coil-kt:coil-compose:2.7.0")
+    implementation(libs.haze)
+    implementation(libs.haze.materials)
+    implementation(libs.palette.ktx)
+    implementation(libs.coil.compose)
 }
