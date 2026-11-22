@@ -683,4 +683,33 @@ class DesktopLocalPlayer : LocalPlayer {
         // order, so a stale earlier snapshot could overwrite a newer one.
         saveQueue.trySend(data)
     }
+
+    override fun setEqualizerEnabled(enabled: Boolean) {
+        emit { it.copy(equalizer = it.equalizer.copy(isEnabled = enabled)) }
+    }
+
+    override fun setEqualizerPreset(preset: com.never.nocturne.core.EqPreset) {
+        emit {
+            it.copy(
+                equalizer = it.equalizer.copy(
+                    preset = preset,
+                    bands = com.never.nocturne.core.EqualizerState.defaultBands(preset),
+                )
+            )
+        }
+    }
+
+    override fun setBassBoost(strength: Int) {
+        emit { it.copy(equalizer = it.equalizer.copy(bassBoost = strength.coerceIn(0, 100))) }
+    }
+
+    override fun setBandGain(bandIndex: Int, gainDb: Int) {
+        emit { snap ->
+            val updated = snap.equalizer.bands.map { band ->
+                if (band.index == bandIndex) band.copy(gainDb = gainDb.coerceIn(band.minGainDb, band.maxGainDb))
+                else band
+            }
+            snap.copy(equalizer = snap.equalizer.copy(bands = updated))
+        }
+    }
 }

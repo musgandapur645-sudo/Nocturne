@@ -73,6 +73,7 @@ class AndroidLocalPlayer(
 
     private val _library:   MutableList<TrackView>  = mutableListOf()
     private val _playOrder: MutableList<TrackView>  = mutableListOf()
+    private val androidEqualizer = AndroidEqualizer()
     private var _cursor: Int = -1
 
     private val _playlists: MutableList<Playlist>     = mutableListOf()
@@ -417,13 +418,55 @@ class AndroidLocalPlayer(
             )
         }
         if (controller.isPlaying) startPositionPoll()
+        androidEqualizer.attach(0)
+        androidEqualizer.applyState(_snapshotFlow.value.equalizer)
     }
 
     fun detachController() {
         stopPositionPoll()
+        androidEqualizer.release()
         controller?.removeListener(playerListener)
         serviceConnectionOnDisconnected()
         controller = null
+    }
+
+    override fun setEqualizerEnabled(enabled: Boolean) {
+        _snapshotFlow.update { snap ->
+            val next = snap.equalizer.copy(isEnabled = enabled)
+            androidEqualizer.applyState(next)
+            snap.copy(equalizer = next)
+        }
+    }
+
+    override fun setEqualizerPreset(preset: com.never.nocturne.core.EqPreset) {
+        _snapshotFlow.update { snap ->
+            val next = snap.equalizer.copy(
+                preset = preset,
+                bands = com.never.nocturne.core.EqualizerState.defaultBands(preset),
+            )
+            androidEqualizer.applyState(next)
+            snap.copy(equalizer = next)
+        }
+    }
+
+    override fun setBassBoost(strength: Int) {
+        _snapshotFlow.update { snap ->
+            val next = snap.equalizer.copy(bassBoost = strength.coerceIn(0, 100))
+            androidEqualizer.applyState(next)
+            snap.copy(equalizer = next)
+        }
+    }
+
+    override fun setBandGain(bandIndex: Int, gainDb: Int) {
+        _snapshotFlow.update { snap ->
+            val updatedBands = snap.equalizer.bands.map { band ->
+                if (band.index == bandIndex) band.copy(gainDb = gainDb.coerceIn(band.minGainDb, band.maxGainDb))
+                else band
+            }
+            val next = snap.equalizer.copy(bands = updatedBands)
+            androidEqualizer.applyState(next)
+            snap.copy(equalizer = next)
+        }
     }
 
     fun stop() { scope.cancel(); detachController() }

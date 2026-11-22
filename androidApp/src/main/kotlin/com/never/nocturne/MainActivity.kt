@@ -120,6 +120,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.Executor
+import com.never.nocturne.core.EqPreset
+import com.never.nocturne.ui.EqualizerDialog
 import com.never.nocturne.ui.LyricsPanel
 import kotlin.math.roundToInt
 
@@ -225,6 +227,10 @@ class MainActivity : ComponentActivity() {
                         onExportSettings = { exportSettingsPicker.launch("nocturne-settings.json") },
                         settingsMessage = settingsMessage,
                         onDismissSettingsMessage = { settingsMessage = null },
+                        onToggleEqualizer = { player.setEqualizerEnabled(it) },
+                        onSelectEqPreset = { player.setEqualizerPreset(it) },
+                        onSetBassBoost = { player.setBassBoost(it) },
+                        onSetBandGain = { band, gain -> player.setBandGain(band, gain) },
                     )
                 }
             }
@@ -408,6 +414,10 @@ fun MainScreen(
     onExportSettings: () -> Unit,
     settingsMessage: String?,
     onDismissSettingsMessage: () -> Unit,
+    onToggleEqualizer: (Boolean) -> Unit = {},
+    onSelectEqPreset: (EqPreset) -> Unit = {},
+    onSetBassBoost: (Int) -> Unit = {},
+    onSetBandGain: (Int, Int) -> Unit = { _, _ -> },
 ) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var showFullPlayer by rememberSaveable { mutableStateOf(false) }
@@ -546,6 +556,10 @@ fun MainScreen(
                 onToggleFavorite = {
                     snap.nowPlaying?.let { onToggleFavorite(it.id) }
                 },
+                onToggleEqualizer = onToggleEqualizer,
+                onSelectEqPreset = onSelectEqPreset,
+                onSetBassBoost = onSetBassBoost,
+                onSetBandGain = onSetBandGain,
             )
         }
 
@@ -1010,11 +1024,16 @@ private fun ConvxFullPlayerDialog(
     onSkipForward: () -> Unit,
     onSkipBackward: () -> Unit,
     onToggleFavorite: () -> Unit,
+    onToggleEqualizer: (Boolean) -> Unit = {},
+    onSelectEqPreset: (EqPreset) -> Unit = {},
+    onSetBassBoost: (Int) -> Unit = {},
+    onSetBandGain: (Int, Int) -> Unit = { _, _ -> },
 ) {
     val now = snap.nowPlaying ?: return
     val ambientColors = rememberArtworkColors(now.artPath)
     val albumName = now.album.orEmpty()
     var showLyrics by remember { mutableStateOf(false) }
+    var showEqualizer by remember { mutableStateOf(false) }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -1067,7 +1086,7 @@ private fun ConvxFullPlayerDialog(
                             modifier = Modifier.size(20.dp),
                         )
                     }
-                    // Centre: title + lyrics toggle pill
+                    // Centre: title + lyrics & equalizer toggle pills
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
                             text = "NOW PLAYING",
@@ -1077,29 +1096,56 @@ private fun ConvxFullPlayerDialog(
                             color = GlassTheme.TextSecondary,
                         )
                         Spacer(modifier = Modifier.height(4.dp))
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(999.dp))
-                                .background(
-                                    if (showLyrics) GlassTheme.Accent.copy(alpha = 0.25f)
-                                    else Color(0x20FFFFFF)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(999.dp))
+                                    .background(
+                                        if (showLyrics) GlassTheme.Accent.copy(alpha = 0.25f)
+                                        else Color(0x20FFFFFF)
+                                    )
+                                    .border(
+                                        1.dp,
+                                        if (showLyrics) GlassTheme.Accent.copy(alpha = 0.6f)
+                                        else Color(0x25FFFFFF),
+                                        RoundedCornerShape(999.dp),
+                                    )
+                                    .clickable { showLyrics = !showLyrics }
+                                    .padding(horizontal = 12.dp, vertical = 4.dp),
+                            ) {
+                                Text(
+                                    text = "LYRICS",
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 1.4.sp,
+                                    color = if (showLyrics) GlassTheme.Accent else GlassTheme.TextMuted,
                                 )
-                                .border(
-                                    1.dp,
-                                    if (showLyrics) GlassTheme.Accent.copy(alpha = 0.6f)
-                                    else Color(0x25FFFFFF),
-                                    RoundedCornerShape(999.dp),
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(999.dp))
+                                    .background(
+                                        if (snap.equalizer.isEnabled) GlassTheme.Accent.copy(alpha = 0.25f)
+                                        else Color(0x20FFFFFF)
+                                    )
+                                    .border(
+                                        1.dp,
+                                        if (snap.equalizer.isEnabled) GlassTheme.Accent.copy(alpha = 0.6f)
+                                        else Color(0x25FFFFFF),
+                                        RoundedCornerShape(999.dp),
+                                    )
+                                    .clickable { showEqualizer = true }
+                                    .padding(horizontal = 12.dp, vertical = 4.dp),
+                            ) {
+                                Text(
+                                    text = if (snap.equalizer.isEnabled) "EQ ON" else "EQ",
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 1.4.sp,
+                                    color = if (snap.equalizer.isEnabled) GlassTheme.Accent else GlassTheme.TextMuted,
                                 )
-                                .clickable { showLyrics = !showLyrics }
-                                .padding(horizontal = 12.dp, vertical = 4.dp),
-                        ) {
-                            Text(
-                                text = "LYRICS",
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.4.sp,
-                                color = if (showLyrics) GlassTheme.Accent else GlassTheme.TextMuted,
-                            )
+                            }
                         }
                     }
                     IconButton(
@@ -1378,6 +1424,18 @@ private fun ConvxFullPlayerDialog(
                         icon = PlayerIcons.Repeat,
                     )
                 }
+            }
+
+            if (showEqualizer) {
+                EqualizerDialog(
+                    state = snap.equalizer,
+                    hazeState = hazeState,
+                    onDismiss = { showEqualizer = false },
+                    onToggleEnabled = onToggleEqualizer,
+                    onSelectPreset = onSelectEqPreset,
+                    onSetBassBoost = onSetBassBoost,
+                    onSetBandGain = onSetBandGain,
+                )
             }
         }
     }

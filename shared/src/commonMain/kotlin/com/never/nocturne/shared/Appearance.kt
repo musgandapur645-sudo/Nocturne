@@ -32,6 +32,7 @@ object ThemePresets {
         ThemePreset("forest", "Forest", 0xFF10B981),
         ThemePreset("amber", "Amber", 0xFFF59E0B),
         ThemePreset("violet", "Violet", 0xFF8B5CF6),
+        ThemePreset("light", "Light Glass", 0xFF2563EB),
     )
 
     /** The shipped look; also the fallback for unknown slugs. */

@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
@@ -57,26 +58,48 @@ data class GlassPalette(
 internal fun buildGlassPalette(settings: AppSettings): GlassPalette {
     val normalized = settings.normalized()
     val accent: AccentTokens = accentTokens(normalized.preset, normalized.accent)
-    return GlassPalette(
-        background = Color(0xFF07080B),
-        // Frosted translucent glass panels (Convx liquid glass aesthetic)
-        surface = Color(0x600F131E),
-        glassCard = Color(0x35141926),
-        glassCardHover = Color(0x55222B40),
-        glassCardActive = Color(0x752C3754),
-        // Specular highlight borders (Apple/Convx top light reflections)
-        border = Color(0x2EFFFFFF),
-        borderSubtle = Color(0x18FFFFFF),
-        borderHighlight = Color(0x45FFFFFF),
-        accent = Color(accent.accent),
-        accentGlow = Color(accent.accentGlow),
-        accentHover = Color(accent.accentHover),
-        textPrimary = Color(0xFFF8FAFC),
-        textSecondary = Color(0xFF94A3B8),
-        textMuted = Color(0xFF94A3B8),
-        glass = glassTokens(normalized.glassIntensity),
-        presetSlug = normalized.preset,
-    )
+    val isLight = normalized.preset.lowercase() == "light"
+    return if (isLight) {
+        GlassPalette(
+            background = Color(0xFFF1F5F9),
+            surface = Color(0xD8FFFFFF),
+            glassCard = Color(0x90FFFFFF),
+            glassCardHover = Color(0xB5FFFFFF),
+            glassCardActive = Color(0xE0FFFFFF),
+            border = Color(0x22000000),
+            borderSubtle = Color(0x10000000),
+            borderHighlight = Color(0x35000000),
+            accent = Color(accent.accent),
+            accentGlow = Color(accent.accentGlow),
+            accentHover = Color(accent.accentHover),
+            textPrimary = Color(0xFF0F172A),
+            textSecondary = Color(0xFF475569),
+            textMuted = Color(0xFF64748B),
+            glass = glassTokens(normalized.glassIntensity),
+            presetSlug = normalized.preset,
+        )
+    } else {
+        GlassPalette(
+            background = Color(0xFF07080B),
+            // Frosted translucent glass panels (Convx liquid glass aesthetic)
+            surface = Color(0x600F131E),
+            glassCard = Color(0x35141926),
+            glassCardHover = Color(0x55222B40),
+            glassCardActive = Color(0x752C3754),
+            // Specular highlight borders (Apple/Convx top light reflections)
+            border = Color(0x2EFFFFFF),
+            borderSubtle = Color(0x18FFFFFF),
+            borderHighlight = Color(0x45FFFFFF),
+            accent = Color(accent.accent),
+            accentGlow = Color(accent.accentGlow),
+            accentHover = Color(accent.accentHover),
+            textPrimary = Color(0xFFF8FAFC),
+            textSecondary = Color(0xFF94A3B8),
+            textMuted = Color(0xFF94A3B8),
+            glass = glassTokens(normalized.glassIntensity),
+            presetSlug = normalized.preset,
+        )
+    }
 }
 
 val LocalGlassPalette = staticCompositionLocalOf { buildGlassPalette(AppSettings()) }
@@ -160,14 +183,25 @@ fun DarkGlassTheme(
     content: @Composable () -> Unit,
 ) {
     val palette = remember(settings) { buildGlassPalette(settings) }
-    val colorScheme = darkColorScheme(
-        background = palette.background,
-        surface = Color.Transparent,
-        primary = palette.accent,
-        onPrimary = Color.White,
-        onBackground = palette.textPrimary,
-        onSurface = palette.textPrimary,
-    )
+    val colorScheme = if (palette.presetSlug.lowercase() == "light") {
+        lightColorScheme(
+            background = palette.background,
+            surface = Color.Transparent,
+            primary = palette.accent,
+            onPrimary = Color.White,
+            onBackground = palette.textPrimary,
+            onSurface = palette.textPrimary,
+        )
+    } else {
+        darkColorScheme(
+            background = palette.background,
+            surface = Color.Transparent,
+            primary = palette.accent,
+            onPrimary = Color.White,
+            onBackground = palette.textPrimary,
+            onSurface = palette.textPrimary,
+        )
+    }
     CompositionLocalProvider(LocalGlassPalette provides palette) {
         MaterialTheme(colorScheme = colorScheme, content = content)
     }

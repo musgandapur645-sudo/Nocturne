@@ -64,6 +64,12 @@ interface LocalPlayer {
     /** Replace settings from JSON text; null on success, else a reason. */
     fun importSettingsJson(text: String): String?
 
+    // ---- equalizer ----
+    fun setEqualizerEnabled(enabled: Boolean) {}
+    fun setEqualizerPreset(preset: com.never.nocturne.core.EqPreset) {}
+    fun setBassBoost(strength: Int) {}
+    fun setBandGain(bandIndex: Int, gainDb: Int) {}
+
     // ---- misc ----
     fun onOpenFolderRequested()
     fun setNowPlaying(view: TrackView?)
@@ -109,4 +115,6 @@ data class LocalPlayerSnapshot(
     val isHistoryPaused: Boolean = false,
     /** Appearance: preset, accent override, glass intensity. */
     val settings: AppSettings = AppSettings(),
+    /** Audio equalizer and bass boost state. */
+    val equalizer: com.never.nocturne.core.EqualizerState = com.never.nocturne.core.EqualizerState(),
 )
