@@ -82,6 +82,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.loadImageBitmap
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -147,6 +148,7 @@ fun main(args: Array<String>) = application {
             exitApplication()
         },
         title = "Nocturne",
+        icon = painterResource("icon.png"),
         state = rememberWindowState(width = 1120.dp, height = 820.dp),
         // Window level so the shortcut works no matter which internal node has
         // focus. Global Space = play/pause, skipped while typing in search.
