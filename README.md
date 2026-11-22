@@ -5,161 +5,175 @@
 <h1 align="center">Nocturne</h1>
 
 <p align="center">
-  A clean, fast, offline local music player for Android and Desktop
+  A clean, fast, offline local music player with a calm, Liquid Glass interface for Android and Desktop.
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License">
-  <img src="https://img.shields.io/badge/Kotlin-Multiplatform-purple.svg" alt="Kotlin Multiplatform">
-  <img src="https://img.shields.io/badge/Compose%20Multiplatform-UI-green.svg" alt="Compose Multiplatform">
-  <img src="https://img.shields.io/badge/Platform-Android%20%7C%20Desktop-orange.svg" alt="Platforms">
+  <a href="https://github.com/musgandapur645-sudo/Nocturne/releases"><img src="https://img.shields.io/badge/Release-v0.2.0-blue.svg?style=flat-square" alt="Version"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square" alt="License"></a>
+  <a href="https://kotlinlang.org/lp/multiplatform/"><img src="https://img.shields.io/badge/Kotlin-Multiplatform-purple.svg?style=flat-square" alt="Kotlin Multiplatform"></a>
+  <a href="https://www.jetbrains.com/compose-multiplatform/"><img src="https://img.shields.io/badge/Compose-Multiplatform-green.svg?style=flat-square" alt="Compose Multiplatform"></a>
+  <a href="#permissions"><img src="https://img.shields.io/badge/Privacy-100%25%20Offline-success.svg?style=flat-square" alt="Privacy"></a>
 </p>
+
+<p align="center">
+  <a href="#features">Features</a> · 
+  <a href="#download">Download</a> · 
+  <a href="#project-structure">Project Structure</a> · 
+  <a href="#build-locally">Build Locally</a> · 
+  <a href="#contributing">Contributing</a>
+</p>
+
+<p align="center">
+  <img src="assets/showcase.png" alt="Nocturne on Desktop and Mobile" width="850">
+</p>
+
+---
+
+## Overview
+
+**Nocturne** brings music playback, local library scanning, and customizable themes together in a unified cross-platform player for Android and Desktop. 
+
+Built from the ground up with Kotlin Multiplatform, Compose Multiplatform, and Media3, Nocturne pairs high-performance local playback with a refined **Liquid Glass** aesthetic: dynamic ambient mesh gradients derived from ID3 album art, frosted translucent surfaces, and tactile Cupertino-inspired controls.
+
+---
 
 ## Features
 
-- 🎵 **Local-Only Playback** - Play MP3, OGG, and WAV files from your local music library
-- 📁 **Smart Scanning** - Automatically scan selected folders, filters out unsupported formats like FLAC
-- 📋 **Playlists** - Create, manage, and play custom playlists
-- ❤️ **Favorites** - Mark your favorite tracks for quick access
-- 📜 **Listening History** - Track your listening history with pause/resume/clear controls
-- 🎨 **Customizable Themes** - Multiple presets, accent colors, and glass intensity effects
-- ⌨️ **Keyboard Shortcuts** - Space to play/pause, arrow keys for navigation, Escape to clear search
-- 🔍 **Search & Filter** - Quickly find tracks in your library
-- 💾 **Persistent State** - Playlists, favorites, history, and settings saved across restarts
-- 🔒 **Privacy First** - 100% offline, no network access, no telemetry or data collection
-- 🎧 **Background Playback** - Android supports background playback with media controls
+### 🎵 Playback & Audio
+- **Local-Only Audio Engine**: Fast, gapless playback for MP3, OGG, and WAV files.
+- **Background Playback**: Background audio with notification media controls, lock screen controls, and automatic audio focus handling (unplugging headphones pauses audio).
+- **Audio Queue & Mixes**: Dynamic queue management with "Up Next", shuffle, repeat modes, and seek scrubbing.
+- **Smart Directory Scanner**: Automatically indexes folders via system pickers without broad storage permissions.
 
-## Screenshots
+### 🪟 Liquid Glass Interface
+- **Ambient Artwork Mesh**: Real-time ambient 4-blob mesh gradient backdrop extracted from embedded album art using color palette analysis.
+- **Cupertino Controls**: Custom spring-bounce glass buttons, capsule toggles (Shuffle, Repeat, Favorite), and tactile seek sliders.
+- **Refractive Frosting**: Integrated Haze blur system across headers, floating mini-player docks, and bottom navigation.
+- **Smooth Splash Transition**: Luminous spring icon entrance animation on app launch.
 
-*Screenshots coming soon. See `assets/` directory for logos and icons.*
+### 📋 Library & Organization
+- **Playlists & Mixes**: Create, rename, delete, and curate custom playlists.
+- **Favorites & Loved Tracks**: Instant one-tap bookmarking with quick-access tabs.
+- **Listening History**: Track recent plays with resume, pause, and clear controls.
+- **Instant Search**: Real-time query filtering with keyboard navigation and shortcut support.
 
-## Installation
+### 🔒 Privacy & Architecture
+- **100% Offline**: No network requests, zero telemetry, no third-party trackers, no analytics.
+- **Safe Storage**: Uses Android SAF (Storage Access Framework) and app-private storage only.
+- **Deterministic Persistence**: Coroutine-backed FIFO serialization ensures playlists, history, and theme settings never corrupt.
 
-### Desktop (Linux, macOS, Windows)
-
-#### Option 1: Download Pre-built Release
-1. Download `nocturne-thin-dist.zip` from the [releases page](../../releases)
-2. Extract the archive
-3. Run with Java 21+:
-   ```bash
-   java -jar nocturne/desktopApp-thin.jar
-   ```
-   Or use the runnable fat jar:
-   ```bash
-   java -jar desktopApp-runnable.jar
-   ```
-
-#### Option 2: Build from Source
-See [Building from Source](#building-from-source) below.
-
-### Android
-
-#### Option 1: Build APK
-```bash
-./gradlew :androidApp:assembleDebug
-```
-APK will be at `androidApp/build/outputs/apk/debug/androidApp-debug.apk`
-
-#### Option 2: Install from Release
-Download the APK from releases and install on your device.
-
-## Building from Source
-
-### Prerequisites
-- [JDK 21](https://adoptium.net/) or later
-- [Android SDK](https://developer.android.com/studio) (for Android builds)
-- Git
-
-### Clone and Build
-
-```bash
-# Clone the repository
-git clone https://github.com/yourusername/nocturne.git
-cd nocturne
-
-# Build desktop
-./gradlew :desktopApp:packageDistributive
-
-# Build Android
-./gradlew :androidApp:assembleDebug
-
-# Run desktop app
-./gradlew :desktopApp:run
-```
-
-## Usage
-
-### Desktop
-1. Launch the app
-2. Click "Open Music Folder" to select your music directory
-3. Browse your library, create playlists, and enjoy your music
-4. Use keyboard shortcuts for faster navigation:
-   - `Space` - Play/Pause
-   - `←/→` (with Ctrl/Cmd) - Previous/Next track
-   - `Escape` - Clear search
-   - `Enter` - Play selected track
-
-### Android
-1. Install and launch the app
-2. Grant folder access via SAF picker
-3. Browse and play your music
-4. Use media controls in notifications for background playback
-
-## Architecture
-
-- **Kotlin Multiplatform** - Shared business logic across platforms
-- **Compose Multiplatform** - Declarative UI for Android and Desktop
-- **ExoPlayer** (Android) - Robust media playback
-- **Java Sound API** (Desktop) - Native audio playback via jaudiotagger
-- **Coroutines & Flow** - Reactive state management
-
-## Permissions
-
-### Android
-- Uses SAF for folder access (no broad storage permissions required)
-- FileProvider restricted to app-private storage only
-- No network, camera, or location permissions
-
-### Desktop
-- Requires read access to selected music folders
-
-## Privacy & Security
-
-- **100% Offline** - No internet connection required or used
-- **No Data Collection** - No analytics, tracking, or telemetry
-- **Local Storage Only** - All data stored on your device
-- **Least Privilege** - Minimal permissions requested
-- See [SECURITY.md](SECURITY.md) for more details
-
-## Contributing
-
-We welcome contributions! Please read our [Code of Conduct](CODE_OF_CONDUCT.md) before contributing.
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## License
-
-This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- Built with [Kotlin Multiplatform](https://kotlinlang.org/lp/multiplatform/)
-- UI powered by [Compose Multiplatform](https://www.jetbrains.com/compose-multiplatform/)
-- Audio playback with [ExoPlayer](https://developer.android.com/media/media3/exoplayer) and [jaudiotagger](http://www.jthink.net/jaudiotagger/)
-
-## Status
-
-**v0.1.0** - Phase 1 & 2 Complete  
-Phase 1: Core playback, playlists, history, persistence ✓  
-Phase 2: Android polish, desktop UX, settings resilience, packaging ✓
-
+---
 
 ## Screenshots
 
 <p align="center">
-  <img src="assets/logo.png" alt="Nocturne Logo" width="400">
+  <img src="screenshots/desktop_liquid_glass_new.png" alt="Nocturne Desktop Home" width="700">
+</p>
+<p align="center">
+  <img src="screenshots/android_current_1.png" alt="Nocturne Android Library" width="320">
+</p>
+
+---
+
+## Download
+
+### Android
+- **Pre-built APK**: Download the latest `androidApp-debug.apk` from [GitHub Releases](https://github.com/musgandapur645-sudo/Nocturne/releases).
+- Compatible with **Android 8.0 (API 26)** and later.
+
+### Desktop (Linux, macOS, Windows)
+- **Standalone Runnable Jar**: Requires [Java 21+](https://adoptium.net/):
+  ```bash
+  java -jar desktopApp-runnable.jar
+  ```
+- **Thin Distribution**: Packaged archive with companion libraries for minimal memory footprint.
+
+---
+
+## Project Structure
+
+Nocturne is organized as a clean Gradle multiplatform workspace:
+
+| Path | Responsibility |
+| :--- | :--- |
+| **`androidApp/`** | Android application entry point (`MainActivity`), background `PlaybackService` (Media3/ExoPlayer), adaptive launcher icons, and Android-specific Liquid Glass layout. |
+| **`desktopApp/`** | Desktop Compose Multiplatform application (`MainKt`), Java Sound playback pipeline, keyboard shortcuts, window controls, and jar/native packaging tasks. |
+| **`shared/`** | Kotlin Multiplatform shared core: data models (`TrackView`, `Playlist`), state snapshot (`LocalPlayerSnapshot`), settings codecs, and FIFO Channel file persistence. |
+| **`assets/`** | Master branding assets, logos, and high-resolution commercial showcase graphics. |
+| **`screenshots/`** | Real device and desktop verification captures for store listings and documentation. |
+
+---
+
+## Build Locally
+
+### Prerequisites
+- **JDK 21** or later (e.g., Eclipse Temurin 21)
+- **Android SDK** (API 34+ / 37 installed, for Android builds)
+- **Git**
+
+### Clone & Build
+
+```bash
+# Clone the repository
+git clone https://github.com/musgandapur645-sudo/Nocturne.git
+cd Nocturne
+
+# Build Android APK
+./gradlew :androidApp:assembleDebug
+
+# Run Desktop app directly
+./gradlew :desktopApp:run
+
+# Build Desktop standalone runnable fat jar
+./gradlew :desktopApp:runnableJar
+```
+
+> **Windows Users:** Use `.\gradlew.bat` in PowerShell / Command Prompt.  
+> Ensure your Android SDK path is declared in `local.properties`:
+> ```properties
+> sdk.dir=C:/Users/<Username>/AppData/Local/Android/Sdk
+> ```
+
+---
+
+## Keyboard Shortcuts (Desktop)
+
+| Shortcut | Action |
+| :--- | :--- |
+| **`Space`** | Play / Pause (yields when typing in search) |
+| **`Ctrl / Cmd + →`** | Skip to next track |
+| **`Ctrl / Cmd + ←`** | Return to previous track |
+| **`Escape`** | Clear search field & reset focus |
+| **`Enter`** | Play selected track |
+
+---
+
+## Contributing
+
+Contributions, bug reports, and suggestions are welcome!
+1. Check the [Code of Conduct](CODE_OF_CONDUCT.md).
+2. Report vulnerabilities confidentially per [SECURITY.md](SECURITY.md).
+3. Open a Pull Request with clear commit messages and test verification.
+
+---
+
+## Security
+
+Nocturne is designed with strict least-privilege principles:
+- **No INTERNET permission** requested on Android or Desktop.
+- All file access is restricted to user-chosen directories via SAF or file pickers.
+- All configuration is kept strictly in app-private sandboxed directories.
+- See [SECURITY.md](SECURITY.md) for full policy details.
+
+---
+
+## License
+
+Nocturne is open source software licensed under the [Apache License 2.0](LICENSE).
+
+---
+
+<p align="center">
+  Maintained with care by <a href="https://github.com/musgandapur645-sudo">Aluu826</a>
 </p>

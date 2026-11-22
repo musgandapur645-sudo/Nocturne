@@ -16,7 +16,7 @@ dependencies {
 
 compose.desktop {
     application {
-        mainClass = "com.never.localmusic.desktop.MainKt"
+        mainClass = "com.never.nocturne.desktop.MainKt"
 
         nativeDistributions {
             targetFormats(TargetFormat.Msi, TargetFormat.Exe, TargetFormat.Deb, TargetFormat.AppImage)
@@ -32,7 +32,7 @@ tasks.register<Jar>("runnableJar") {
     archiveClassifier.set("runnable")
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     manifest {
-        attributes["Main-Class"] = "com.never.localmusic.desktop.MainKt"
+        attributes["Main-Class"] = "com.never.nocturne.desktop.MainKt"
     }
 
     dependsOn(tasks.named("compileKotlin"))
@@ -41,12 +41,12 @@ tasks.register<Jar>("runnableJar") {
 }
 
 // Thin jar: classes only, with Class-Path manifest pointing at lib/*.jar.
-// Run with: java -cp "lib/*:desktopApp-thin.jar" com.never.localmusic.desktop.MainKt
+// Run with: java -cp "lib/*:desktopApp-thin.jar" com.never.nocturne.desktop.MainKt
 // Or: java -jar desktopApp-thin.jar  (when lib/ is alongside the jar)
 tasks.register<Jar>("thinJar") {
     archiveClassifier.set("thin")
     manifest {
-        attributes["Main-Class"] = "com.never.localmusic.desktop.MainKt"
+        attributes["Main-Class"] = "com.never.nocturne.desktop.MainKt"
         attributes["Class-Path"] = ""
     }
 

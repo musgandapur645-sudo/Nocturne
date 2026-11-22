@@ -1,7 +1,7 @@
 # Nocturne v0.1.0 — Release Readiness & Verification Report
 
 **Date & Time**: 2026-11-03 17:50:00 (UTC+5)  
-**Target Repo**: `/home/never/Work/projects/local-music-player`  
+**Target Repo**: `/home/never/Work/projects/nocturne`  
 **Target Tag**: `v0.1.0`  
 **Overall Status**: ⚠️ **ACTION REQUIRED BEFORE RELEASE** (Code & builds PASS; Git working tree needs commit)
 
@@ -100,7 +100,7 @@ To complete the release gate, run the following steps:
 
 1. **Commit Phase 2 Implementation**:
    ```bash
-   cd /home/never/Work/projects/local-music-player
+   cd /home/never/Work/projects/nocturne
    git add -A
    git commit -m "feat: complete Phase 2 UI polish, appearance settings, and FIFO persistence"
    ```
