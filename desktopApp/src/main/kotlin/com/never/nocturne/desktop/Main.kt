@@ -92,6 +92,8 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.never.nocturne.core.TrackView
 import com.never.nocturne.desktop.ui.ConvxMeshBackground
+import com.never.nocturne.desktop.ui.DesktopEqualizerDialog
+import com.never.nocturne.desktop.ui.DesktopLyricsDialog
 import com.never.nocturne.desktop.ui.PlayerIcons
 import com.never.nocturne.desktop.ui.rememberArtworkPalette
 import com.never.nocturne.shared.AppSettings
@@ -213,6 +215,8 @@ fun NocturneApp(player: DesktopLocalPlayer, searchFocus: SearchFocusFlag) {
     var showNewPlaylistDialog by remember { mutableStateOf(false) }
     var addToPlaylistTrack by remember { mutableStateOf<TrackView?>(null) }
     var appearanceMessage by remember { mutableStateOf<String?>(null) }
+    var showEqualizerDialog by remember { mutableStateOf(false) }
+    var showLyricsDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         searchFocus.clearSearch = {
@@ -636,6 +640,29 @@ fun NocturneApp(player: DesktopLocalPlayer, searchFocus: SearchFocusFlag) {
                 onToggleShuffle = { player.toggleShuffle() },
                 onToggleRepeat = { player.toggleRepeat() },
                 onToggleFavorite = { trackId -> player.toggleFavorite(trackId) },
+                onToggleEqualizer = { showEqualizerDialog = true },
+                onToggleLyrics = { showLyricsDialog = true },
+            )
+        }
+
+        if (showEqualizerDialog) {
+            DesktopEqualizerDialog(
+                state = snap.equalizer,
+                onDismiss = { showEqualizerDialog = false },
+                onToggleEnabled = { player.setEqualizerEnabled(it) },
+                onSelectPreset = { player.setEqualizerPreset(it) },
+                onSetBassBoost = { player.setBassBoost(it) },
+                onSetBandGain = { band, gain -> player.setBandGain(band, gain) },
+            )
+        }
+
+        if (showLyricsDialog) {
+            DesktopLyricsDialog(
+                trackPath = snap.nowPlaying?.id,
+                trackTitle = snap.nowPlaying?.title ?: "No track playing",
+                artist = snap.nowPlaying?.artist,
+                positionMs = snap.positionMs,
+                onDismiss = { showLyricsDialog = false },
             )
         }
 
@@ -1516,6 +1543,8 @@ fun FloatingNowPlayingBar(
     onToggleShuffle: () -> Unit,
     onToggleRepeat: () -> Unit,
     onToggleFavorite: (String) -> Unit,
+    onToggleEqualizer: () -> Unit = {},
+    onToggleLyrics: () -> Unit = {},
 ) {
     val track = snap.nowPlaying
     val isFav = track != null && snap.favorites.contains(track.id)
@@ -1751,6 +1780,28 @@ fun FloatingNowPlayingBar(
                     tint = if (snap.isRepeat) GlassColors.Accent else GlassColors.TextSecondary,
                     iconSize = 18.dp,
                     onClick = onToggleRepeat,
+                )
+
+                Box(
+                    modifier = Modifier
+                        .height(18.dp)
+                        .width(1.dp)
+                        .background(Color(0x20FFFFFF))
+                )
+
+                SpringIconButton(
+                    icon = PlayerIcons.Sliders,
+                    description = "Equalizer",
+                    tint = if (snap.equalizer.isEnabled) GlassColors.Accent else GlassColors.TextSecondary,
+                    iconSize = 18.dp,
+                    onClick = onToggleEqualizer,
+                )
+                SpringIconButton(
+                    icon = PlayerIcons.MusicNote,
+                    description = "Lyrics",
+                    tint = GlassColors.TextSecondary,
+                    iconSize = 18.dp,
+                    onClick = onToggleLyrics,
                 )
             }
         }
