@@ -83,7 +83,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.loadImageBitmap
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -561,7 +560,6 @@ fun NocturneApp(player: DesktopLocalPlayer, searchFocus: SearchFocusFlag) {
                             snap = snap,
                             onPlay = { player.playSelected(it) },
                             onToggleFav = { player.toggleFavorite(it) },
-                            onBrowseLibrary = { selectedNav = 0 },
                         )
                         6 -> HistoryView(
                             snap = snap,
@@ -784,7 +782,7 @@ fun HomeLibraryView(
         // Shelf 1: recent listening with a more editorial, feature-led opening.
         if (snap.history.isNotEmpty()) {
             item {
-                val recent = snap.history.distinctBy { it.trackId }.take(6)
+                val recent = snap.history.take(6)
                 val featuredTrack = recent.firstOrNull()?.let { entry ->
                     snap.library.firstOrNull { it.id == entry.trackId }
                 }
@@ -933,7 +931,7 @@ fun HomeLibraryView(
                 val stats = listOf(
                     "${tracks.size} tracks" to "Library",
                     "${snap.favorites.size} saved" to "Favorites",
-                    "${snap.history.size} plays" to "History",
+                    "${snap.history.size} recent" to "History",
                 )
                 stats.forEach { (value, label) ->
                     Box(
@@ -1924,7 +1922,6 @@ fun FavoritesView(
     snap: LocalPlayerSnapshot,
     onPlay: (TrackView) -> Unit,
     onToggleFav: (String) -> Unit,
-    onBrowseLibrary: () -> Unit,
 ) {
     val favTracks = snap.library.filter { snap.favorites.contains(it.id) }
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -1936,20 +1933,13 @@ fun FavoritesView(
         )
         if (favTracks.isEmpty()) {
             Box(
-                modifier = Modifier.fillMaxWidth().weight(1f).padding(40.dp),
+                modifier = Modifier.fillMaxWidth().padding(40.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(14.dp),
-                ) {
-                    Text(
-                        "No favorites yet. Tap the heart on any track to add it here.",
-                        color = GlassColors.TextMuted,
-                        textAlign = TextAlign.Center,
-                    )
-                    Button(onClick = onBrowseLibrary) { Text("Browse library") }
-                }
+                Text(
+                    "No favorites yet. Tap the heart on any track to add it here.",
+                    color = GlassColors.TextMuted,
+                )
             }
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -4,6 +4,7 @@
 
 | Version | Supported          |
 | ------- | ------------------ |
+| 0.2.x   | :white_check_mark: |
 | 0.1.x   | :white_check_mark: |
 
 ## Reporting a Vulnerability
@@ -11,7 +12,7 @@
 If you discover a security vulnerability in Nocturne, please report it responsibly:
 
 1. **Do not** open a public GitHub issue
-2. Email the maintainers with details of the vulnerability
+2. Email the maintainer at **musgandapur645@gmail.com** with details of the vulnerability
 3. Include steps to reproduce, impact assessment, and any proof-of-concept
 4. Allow reasonable time for a fix before public disclosure
 

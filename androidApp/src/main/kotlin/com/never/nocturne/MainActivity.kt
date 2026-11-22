@@ -4,7 +4,6 @@ import android.app.Activity
 import android.content.Intent
 import android.media.MediaMetadataRetriever
 import android.net.Uri
-import androidx.core.net.toUri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -418,7 +417,7 @@ fun MainScreen(
         ) {
             // Convx Liquid Glass Header
             val folderName = snap.library.firstOrNull()?.let {
-                it.id.toUri().lastPathSegment?.substringBeforeLast('/')
+                Uri.parse(it.id).lastPathSegment?.substringBeforeLast('/')
             } ?: "Music"
 
             ConvxHeader(
@@ -497,6 +496,8 @@ fun MainScreen(
                         snap = snap,
                         isFavorite = snap.favorites.contains(snap.nowPlaying?.id ?: ""),
                         onTogglePlayPause = onTogglePlayPause,
+                        onNext = onNext,
+                        onPrevious = onPrevious,
                         onToggleFavorite = {
                             snap.nowPlaying?.let { onToggleFavorite(it.id) }
                         },
@@ -708,6 +709,8 @@ private fun ConvxMiniPlayer(
     snap: LocalPlayerSnapshot,
     isFavorite: Boolean,
     onTogglePlayPause: () -> Unit,
+    onNext: () -> Unit,
+    onPrevious: () -> Unit,
     onToggleFavorite: () -> Unit,
     onClick: () -> Unit,
 ) {
@@ -792,27 +795,45 @@ private fun ConvxMiniPlayer(
                 ) {
                     IconButton(
                         onClick = onToggleFavorite,
-                        modifier = Modifier.size(48.dp),
+                        modifier = Modifier.size(34.dp),
                     ) {
                         Icon(
                             imageVector = if (isFavorite) PlayerIcons.Favorite else PlayerIcons.FavoriteBorder,
-                            contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
+                            contentDescription = "Favorite",
                             tint = if (isFavorite) GlassTheme.Accent else GlassTheme.TextSecondary,
                             modifier = Modifier.size(19.dp),
                         )
                     }
 
                     IconButton(
-                        onClick = onTogglePlayPause,
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(CircleShape)
-                            .background(GlassTheme.Accent),
+                        onClick = onPrevious,
+                        modifier = Modifier.size(34.dp),
                     ) {
                         Icon(
-                            imageVector = if (snap.isPlaying) PlayerIcons.Pause else PlayerIcons.Play,
-                            contentDescription = if (snap.isPlaying) "Pause" else "Play",
-                            tint = Color.White,
+                            imageVector = PlayerIcons.SkipPrev,
+                            contentDescription = "Previous",
+                            tint = GlassTheme.TextSecondary,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+
+                    CupertinoGlassButton(
+                        onClick = onTogglePlayPause,
+                        size = 38.dp,
+                        icon = if (snap.isPlaying) PlayerIcons.Pause else PlayerIcons.Play,
+                        iconSize = 18.dp,
+                        iconTint = Color.White,
+                        backgroundColor = GlassTheme.Accent,
+                    )
+
+                    IconButton(
+                        onClick = onNext,
+                        modifier = Modifier.size(34.dp),
+                    ) {
+                        Icon(
+                            imageVector = PlayerIcons.SkipNext,
+                            contentDescription = "Next",
+                            tint = GlassTheme.TextSecondary,
                             modifier = Modifier.size(20.dp),
                         )
                     }
@@ -905,7 +926,7 @@ private fun ConvxFullPlayerDialog(
                     IconButton(
                         onClick = onDismiss,
                         modifier = Modifier
-                            .size(48.dp)
+                            .size(38.dp)
                             .clip(CircleShape)
                             .background(Color(0x25FFFFFF)),
                     ) {
@@ -926,13 +947,13 @@ private fun ConvxFullPlayerDialog(
                     IconButton(
                         onClick = onToggleFavorite,
                         modifier = Modifier
-                            .size(48.dp)
+                            .size(38.dp)
                             .clip(CircleShape)
                             .background(if (isFavorite) GlassTheme.Accent.copy(alpha = 0.25f) else Color(0x25FFFFFF)),
                     ) {
                         Icon(
                             imageVector = if (isFavorite) PlayerIcons.Favorite else PlayerIcons.FavoriteBorder,
-                            contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
+                            contentDescription = "Favorite",
                             tint = if (isFavorite) GlassTheme.Accent else GlassTheme.TextPrimary,
                             modifier = Modifier.size(20.dp),
                         )
@@ -1779,10 +1800,59 @@ private fun PlaylistsTab(
                 modifier = Modifier.fillMaxSize().padding(vertical = 32.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(
-                    text = "No playlists yet \u2014 tap New to create one",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Surface(
+                    shape = RoundedCornerShape(24.dp),
+                    color = Color(0xFF101823).copy(alpha = 0.9f),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.06f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp),
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp, vertical = 28.dp),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(58.dp)
+                                .clip(RoundedCornerShape(18.dp))
+                                .background(Color(0xFF121C2C))
+                                .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(18.dp)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = PlayerIcons.Playlists,
+                                contentDescription = null,
+                                tint = GlassTheme.Accent,
+                                modifier = Modifier.size(24.dp),
+                            )
+                        }
+                        Text(
+                            text = "No playlists yet",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = GlassTheme.TextPrimary,
+                        )
+                        Text(
+                            text = "Create playlists to group and play your favorite songs.",
+                            color = GlassTheme.TextSecondary,
+                            textAlign = TextAlign.Center,
+                        )
+                        Button(
+                            onClick = { showCreate = true },
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = GlassTheme.Accent,
+                                contentColor = Color.White,
+                            ),
+                        ) {
+                            Text("Create playlist")
+                        }
+                    }
+                }
             }
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {

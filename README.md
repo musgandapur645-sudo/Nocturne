@@ -74,7 +74,7 @@ Download the APK from releases and install on your device.
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/nocturne.git
+git clone https://github.com/musgandapur645-sudo/Nocturne.git
 cd nocturne
 
 # Build desktop
@@ -161,13 +161,16 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 
 ## Status
 
-**v0.1.0** - Phase 1 & 2 Complete  
-Phase 1: Core playback, playlists, history, persistence ✓  
-Phase 2: Android polish, desktop UX, settings resilience, packaging ✓
-
+**v0.2.0** - Liquid Glass UI Overhaul & Package Refactor  
+- Phase 1: Core playback, playlists, history, persistence ✓  
+- Phase 2: Android polish, desktop UX, settings resilience, packaging ✓  
+- Phase 3: Liquid Glass UI overhaul, artwork ambient mesh backdrop, Cupertino controls, density-scaled adaptive icons ✓
 
 ## Screenshots
 
 <p align="center">
-  <img src="assets/logo.png" alt="Nocturne Logo" width="400">
+  <img src="screenshots/desktop_liquid_glass_new.png" alt="Nocturne Desktop UI" width="700">
+</p>
+<p align="center">
+  <img src="screenshots/android_current_1.png" alt="Nocturne Android UI" width="300">
 </p>

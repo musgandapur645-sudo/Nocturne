@@ -24,6 +24,9 @@ art_cache/
 spikes/*.log
 spikes/ui.xml
 
+# Local tools and caches
+.taste-skill/
+
 # Build artifacts for jar distribution (regenerated via gradle)
 lib/
 META-INF/
