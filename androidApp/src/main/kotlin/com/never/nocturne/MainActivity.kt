@@ -37,6 +37,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -119,6 +120,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.Executor
+import com.never.nocturne.ui.LyricsPanel
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -1012,6 +1014,7 @@ private fun ConvxFullPlayerDialog(
     val now = snap.nowPlaying ?: return
     val ambientColors = rememberArtworkColors(now.artPath)
     val albumName = now.album.orEmpty()
+    var showLyrics by remember { mutableStateOf(false) }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -1064,13 +1067,41 @@ private fun ConvxFullPlayerDialog(
                             modifier = Modifier.size(20.dp),
                         )
                     }
-                    Text(
-                        text = "NOW PLAYING",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.8.sp,
-                        color = GlassTheme.TextSecondary,
-                    )
+                    // Centre: title + lyrics toggle pill
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "NOW PLAYING",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.8.sp,
+                            color = GlassTheme.TextSecondary,
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(999.dp))
+                                .background(
+                                    if (showLyrics) GlassTheme.Accent.copy(alpha = 0.25f)
+                                    else Color(0x20FFFFFF)
+                                )
+                                .border(
+                                    1.dp,
+                                    if (showLyrics) GlassTheme.Accent.copy(alpha = 0.6f)
+                                    else Color(0x25FFFFFF),
+                                    RoundedCornerShape(999.dp),
+                                )
+                                .clickable { showLyrics = !showLyrics }
+                                .padding(horizontal = 12.dp, vertical = 4.dp),
+                        ) {
+                            Text(
+                                text = "LYRICS",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.4.sp,
+                                color = if (showLyrics) GlassTheme.Accent else GlassTheme.TextMuted,
+                            )
+                        }
+                    }
                     IconButton(
                         onClick = onToggleFavorite,
                         modifier = Modifier
@@ -1087,6 +1118,17 @@ private fun ConvxFullPlayerDialog(
                     }
                 }
 
+                // Artwork OR Lyrics panel (toggled by LYRICS pill)
+                if (showLyrics) {
+                    LyricsPanel(
+                        trackPath = now.id, // id == file path for local tracks
+                        positionMs = snap.positionMs,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f, fill = false)
+                            .heightIn(min = 200.dp, max = 380.dp),
+                    )
+                } else {
                 // Big Album Artwork Card with ambient shadow & specular border
                 val fullArtPath = now.artPath
                 Column(
@@ -1163,6 +1205,7 @@ private fun ConvxFullPlayerDialog(
                             }
                         }
                     }
+                }
                 }
 
                 // Track Title & Artist
