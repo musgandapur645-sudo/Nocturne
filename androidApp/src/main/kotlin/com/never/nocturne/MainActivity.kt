@@ -8,6 +8,15 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -58,6 +67,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -71,6 +81,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -104,6 +115,7 @@ import com.never.nocturne.shared.ThemePresets
 import com.never.nocturne.shared.formatHex
 import com.never.nocturne.shared.parseHex
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.Executor
@@ -397,6 +409,7 @@ fun MainScreen(
 ) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var showFullPlayer by rememberSaveable { mutableStateOf(false) }
+    var showSplash by rememberSaveable { mutableStateOf(true) }
     val hazeState = remember { HazeState() }
     val ambientColors = rememberArtworkColors(snap.nowPlaying?.artPath)
 
@@ -543,6 +556,120 @@ fun MainScreen(
                     TextButton(onClick = onDismissSettingsMessage) { Text("OK") }
                 },
             )
+        }
+
+        // Animated Splash Launch Screen
+        AnimatedVisibility(
+            visible = showSplash,
+            enter = fadeIn(),
+            exit = fadeOut(tween(350, easing = FastOutSlowInEasing)) +
+                scaleOut(targetScale = 1.05f, animationSpec = tween(350)),
+        ) {
+            AppSplashScreen(onFinished = { showSplash = false })
+        }
+    }
+}
+
+@Composable
+private fun AppSplashScreen(onFinished: () -> Unit) {
+    var startAnimation by remember { mutableStateOf(false) }
+
+    val scale by animateFloatAsState(
+        targetValue = if (startAnimation) 1f else 0.8f,
+        animationSpec = spring(
+            dampingRatio = 0.72f,
+            stiffness = 250f,
+        ),
+        label = "splashScale",
+    )
+    val alpha by animateFloatAsState(
+        targetValue = if (startAnimation) 1f else 0f,
+        animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing),
+        label = "splashAlpha",
+    )
+    val glowAlpha by animateFloatAsState(
+        targetValue = if (startAnimation) 0.35f else 0f,
+        animationSpec = tween(durationMillis = 600, easing = LinearOutSlowInEasing),
+        label = "splashGlow",
+    )
+
+    LaunchedEffect(Unit) {
+        startAnimation = true
+        delay(1150)
+        onFinished()
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF080C14)),
+        contentAlignment = Alignment.Center,
+    ) {
+        // Ambient glow behind icon
+        Box(
+            modifier = Modifier
+                .size(220.dp)
+                .graphicsLayer {
+                    this.scaleX = scale * 1.25f
+                    this.scaleY = scale * 1.25f
+                    this.alpha = glowAlpha
+                }
+                .background(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            GlassTheme.Accent.copy(alpha = 0.5f),
+                            Color(0xFF5B42F3).copy(alpha = 0.25f),
+                            Color.Transparent,
+                        ),
+                    ),
+                    shape = CircleShape,
+                )
+        )
+
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.graphicsLayer {
+                this.scaleX = scale
+                this.scaleY = scale
+                this.alpha = alpha
+            },
+        ) {
+            Surface(
+                shape = RoundedCornerShape(26.dp),
+                color = Color(0xFF101723).copy(alpha = 0.9f),
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
+                shadowElevation = 18.dp,
+            ) {
+                Box(
+                    modifier = Modifier.padding(22.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    androidx.compose.foundation.Image(
+                        painter = androidx.compose.ui.res.painterResource(id = com.never.nocturne.R.drawable.nocturne_icon),
+                        contentDescription = "Nocturne Logo",
+                        modifier = Modifier
+                            .size(76.dp)
+                            .clip(RoundedCornerShape(18.dp)),
+                    )
+                }
+            }
+
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "Nocturne",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = GlassTheme.TextPrimary,
+                    letterSpacing = 2.sp,
+                )
+                Text(
+                    text = "Liquid Glass Music",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = GlassTheme.TextSecondary.copy(alpha = 0.8f),
+                    letterSpacing = 1.2.sp,
+                )
+            }
         }
     }
 }
